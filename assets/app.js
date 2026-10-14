@@ -2,7 +2,7 @@
   "use strict";
 
   var params = new URLSearchParams(location.search);
-  var key = (params.get("s") || "demo").toLowerCase();
+  var key = (params.get("s") || window.TAPRIZZ_DEFAULT_STORE || "demo").toLowerCase();
   var preview = key === "__preview";
   var $ = function (id) { return document.getElementById(id); };
   var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
