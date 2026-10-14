@@ -34,6 +34,7 @@
     return s;
   }
   var ICONS = {
+    dash: "M4 20V10M10 20V4M16 20v-7M22 20H2",
     shops: "M4 9l1.2-4.5h13.6L20 9M4 9v10h16V9M4 9h16M9 19v-5h6v5",
     gear: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z",
     back: "M15 18l-6-6 6-6",
@@ -89,6 +90,8 @@
     if (/slug_check/.test(m)) return "Page link: use 2 to 40 lowercase letters, numbers or hyphens. Words like admin are reserved.";
     if (/review_url_check/.test(m)) return "The AI review link must start with https://";
     if (/map_url_check/.test(m)) return "The location link must start with https://";
+    if (/website_check/.test(m)) return "The website link must start with https://";
+    if (/bad_buttons/.test(m)) return "One of the extra buttons is not valid. Check its name and link.";
     if (/instagram_check/.test(m)) return "Instagram must be a handle or an https:// link.";
     if (/whatsapp_check/.test(m)) return "WhatsApp number: digits only, with country code.";
     if (/color_check/.test(m)) return "Please pick a valid colour.";
@@ -175,7 +178,8 @@
   }
   function nav(active) {
     return h("nav", { class: "nav", "aria-label": "Main" }, [h("div", {}, [
-      h("a", { href: "#/", "aria-current": active === "shops" ? "page" : null }, [icon(ICONS.shops), "Shops"]),
+      h("a", { href: "#/", "aria-current": active === "dash" ? "page" : null }, [icon(ICONS.dash), "Dashboard"]),
+      h("a", { href: "#/shops", "aria-current": active === "shops" ? "page" : null }, [icon(ICONS.shops), "Shops"]),
       h("a", { href: "#/settings", "aria-current": active === "settings" ? "page" : null }, [icon(ICONS.gear), "Settings"])
     ])]);
   }
@@ -256,18 +260,83 @@
     ]);
   }
 
+  var TAP_LABELS = [["review", "AI review"], ["map", "Location"], ["whatsapp", "WhatsApp"], ["instagram", "Instagram"], ["website", "Website"], ["custom", "Extra buttons"], ["game", "Game opens"]];
+
+  function viewDash() {
+    current = "dash";
+    var range = h("select", { "aria-label": "Period" }, [7, 30, 90].map(function (d) { return h("option", { value: d, text: "Last " + d + " days" }); }));
+    range.value = "30";
+    var body = h("div", {}, [h("div", { class: "skeleton" }), h("div", { class: "skeleton" })]);
+    var nudge = installDismissed ? null : installCard(true);
+    screen([
+      h("div", { class: "top" }, [
+        h("div", {}, [h("h1", { text: "Dashboard" }), h("p", { class: "sub", text: "All your shops together" })]),
+        h("a", { class: "btn primary small", href: "#/new" }, [icon(ICONS.plus, 18), "Add shop"])
+      ]),
+      nudge,
+      h("div", { class: "field", style: "margin:12px 0 0" }, [range]),
+      body,
+      nav("dash")
+    ]);
+    function load() {
+      guarded(rpc("sq_admin_overview", { p_key: adminKey, p_days: +range.value }), function (e) {
+        body.innerHTML = "";
+        body.appendChild(h("div", { class: "empty" }, [h("p", { text: errText(e) }), h("button", { class: "btn", type: "button", text: "Try again", onclick: load })]));
+      }).then(function (r) {
+        if (r === FAIL) return;
+        body.innerHTML = "";
+        if (!r.shops) {
+          body.appendChild(h("div", { class: "empty" }, [
+            h("h2", { text: "Welcome" }),
+            h("p", { text: "Add your first shop to get its page link and QR code. Numbers appear here once people start scanning." }),
+            h("a", { class: "btn primary", href: "#/new", style: "margin-top:12px" }, [icon(ICONS.plus, 18), "Add shop"])
+          ]));
+          return;
+        }
+        var c = r.counts || {}, taps = 0, k;
+        for (k in c) if (k !== "view") taps += c[k];
+        var max = Math.max.apply(null, r.daily.map(function (d) { return d.views; }).concat([1]));
+        body.appendChild(h("div", { class: "card" }, [
+          h("h2", { text: "Overview" }),
+          h("div", { class: "kv" }, [
+            h("div", {}, [h("b", { text: String(c.view || 0) }), h("span", { text: "Page views" })]),
+            h("div", {}, [h("b", { text: String(taps) }), h("span", { text: "Button taps" })]),
+            h("div", {}, [h("b", { text: r.live + "/" + r.shops }), h("span", { text: "Shops live" })])
+          ]),
+          h("div", { class: "bars", role: "img", "aria-label": "Page views per day, last 14 days" }, r.daily.map(function (d) {
+            return h("i", { style: "height:" + Math.max(4, Math.round(d.views / max * 100)) + "%", title: d.d + ": " + d.views });
+          })),
+          h("div", { class: "axis" }, [h("span", { text: "14 days ago" }), h("span", { text: "Today" })])
+        ]));
+        body.appendChild(h("div", { class: "card" }, [
+          h("h2", { text: "Which buttons get tapped" }),
+          h("div", { class: "kv" }, TAP_LABELS.map(function (p) { return h("div", {}, [h("b", { text: String(c[p[0]] || 0) }), h("span", { text: p[1] })]); }))
+        ]));
+        var top = h("div", { class: "card" }, [h("h2", { text: "Top shops" })]);
+        r.top.forEach(function (t) {
+          top.appendChild(h("a", { class: "shop", style: "margin-top:8px", href: "#/shop/" + encodeURIComponent(t.slug) }, [
+            h("div", { class: "meta" }, [h("b", { text: t.name }), h("span", { text: t.views + " views · " + t.taps + " taps" })]),
+            h("div", { class: "end" }, [h("b", { class: t.active ? "" : "off", text: t.active ? "Live" : "Paused" })])
+          ]));
+        });
+        top.appendChild(h("a", { class: "btn", href: "#/shops", style: "margin-top:12px;width:100%", text: "See all shops" }));
+        body.appendChild(top);
+      });
+    }
+    range.addEventListener("change", load);
+    load();
+  }
+
   function viewList() {
     current = "list";
     var holder = h("div", {}, [h("div", { class: "skeleton" }), h("div", { class: "skeleton" })]);
     var search = h("input", { type: "search", placeholder: "Search shops", "aria-label": "Search shops" });
-    var nudge = installDismissed ? null : installCard(true);
     var count = h("p", { class: "sub", text: "Loading..." });
     screen([
       h("div", { class: "top" }, [
         h("div", {}, [h("h1", { text: "Shops" }), count]),
         h("a", { class: "btn primary small", href: "#/new" }, [icon(ICONS.plus, 18), "Add shop"])
       ]),
-      nudge,
       h("div", { class: "field search" }, [search]),
       holder,
       nav("shops")
@@ -336,17 +405,18 @@
   function viewEdit(slug) {
     current = "edit";
     var isNew = !slug;
-    var blank = { slug: "", name: "", address: "", color: "#2563eb", reviewUrl: "", mapUrl: "", whatsapp: "", instagram: "", gameOn: true, active: true, logo: null, logoThumb: null };
-    screen([h("div", { class: "top" }, [h("a", { class: "back", href: "#/" }, [icon(ICONS.back, 20), "Shops"])]), h("div", { class: "skeleton" }), h("div", { class: "skeleton" })]);
+    var blank = { slug: "", name: "", address: "", color: "#2563eb", reviewUrl: "", mapUrl: "", whatsapp: "", instagram: "", website: "", buttons: [], gameOn: true, active: true, logo: null, logoThumb: null };
+    screen([h("div", { class: "top" }, [h("a", { class: "back", href: "#/shops" }, [icon(ICONS.back, 20), "Shops"])]), h("div", { class: "skeleton" }), h("div", { class: "skeleton" })]);
     if (isNew) { build(blank); return; }
     guarded(rpc("sq_admin_get", { p_key: adminKey, p_slug: slug }), function (e) {
-      screen([h("div", { class: "top" }, [h("a", { class: "back", href: "#/" }, [icon(ICONS.back, 20), "Shops"])]),
+      screen([h("div", { class: "top" }, [h("a", { class: "back", href: "#/shops" }, [icon(ICONS.back, 20), "Shops"])]),
         h("div", { class: "empty" }, [h("p", { text: errText(e) })]), nav("shops")]);
     }).then(function (s) { if (s !== FAIL) build(s); });
 
     function build(src) {
       var st = JSON.parse(JSON.stringify(src));
-      ["address", "reviewUrl", "mapUrl", "whatsapp", "instagram"].forEach(function (k) { if (st[k] == null) st[k] = ""; });
+      ["address", "reviewUrl", "mapUrl", "whatsapp", "instagram", "website"].forEach(function (k) { if (st[k] == null) st[k] = ""; });
+      st.buttons = (st.buttons || []).map(function (b) { return { kind: b.kind, label: b.label, value: b.kind === "call" ? waLabel(b.value) : b.value }; });
       st.color = String(st.color || "#2563eb").toLowerCase();
       st.whatsappRaw = st.whatsapp ? waLabel(st.whatsapp) : ""; st.instagramRaw = st.instagram; st.logoChanged = false;
       var orig = JSON.stringify(st), slugTouched = !isNew;
@@ -361,7 +431,10 @@
         pv.appendChild(h("p", { text: st.address || " " }));
         var two = h("div", { class: "two" }, []);
         two.appendChild(h("i")); if (st.whatsappRaw) two.appendChild(h("i"));
-        pv.appendChild(h("div", { class: "bx" }, [st.reviewUrl ? h("i", { style: "height:46px" }) : null, two, st.instagramRaw ? h("i") : null, st.gameOn ? h("i", { class: "dark" }) : null]));
+        var more = [];
+        if (st.website.trim()) more.push(h("i"));
+        st.buttons.forEach(function () { more.push(h("i")); });
+        pv.appendChild(h("div", { class: "bx" }, [st.reviewUrl ? h("i", { style: "height:46px" }) : null, two, st.instagramRaw ? h("i") : null].concat(more, [st.gameOn ? h("i", { class: "dark" }) : null])));
         var lg = h("div", { class: "lg" });
         if (st.logo || st.logoThumb) lg.appendChild(h("img", { src: st.logo || st.logoThumb, alt: "" }));
         else lg.appendChild(h("div", { class: "mono", text: initials(st.name) }));
@@ -390,6 +463,33 @@
         waHint.textContent = n.ok && n.value ? "Opens WhatsApp chat with " + waLabel(n.value) : n.ok ? "With or without +91. We add 91 to 10-digit numbers." : "Enter a valid number.";
         touch();
       });
+      var website = bind(h("input", { id: "f-web", type: "url", value: st.website, inputmode: "url", autocomplete: "off", autocapitalize: "none", placeholder: "www.yourshop.com" }), "website");
+
+      // extra buttons (owner's own: menu, booking, offer, call, email...)
+      var MAXB = 6, btnList = h("div"), addBtn = h("button", { class: "btn small", type: "button", onclick: function () {
+        if (st.buttons.length >= MAXB) return;
+        st.buttons.push({ kind: "link", label: "", value: "" }); paintButtons(); touch();
+        var rows = btnList.querySelectorAll(".btrow input"); if (rows.length) rows[rows.length - 2].focus();
+      } });
+      var KIND_HINT = { link: ["Button name, e.g. View menu", "https://..."], call: ["Button name, e.g. Call us", "98765 43210"], email: ["Button name, e.g. Email us", "hello@shop.com"] };
+      function paintButtons() {
+        btnList.innerHTML = "";
+        st.buttons.forEach(function (b, i) {
+          var kind = h("select", { "aria-label": "Button type " + (i + 1) }, [h("option", { value: "link", text: "Open a link" }), h("option", { value: "call", text: "Phone call" }), h("option", { value: "email", text: "Email" })]);
+          kind.value = b.kind;
+          var label = h("input", { type: "text", maxlength: "28", value: b.label, autocomplete: "off", "aria-label": "Button name " + (i + 1), placeholder: KIND_HINT[b.kind][0] });
+          var value = h("input", { type: "text", value: b.value, autocomplete: "off", autocapitalize: "none", spellcheck: "false", "aria-label": "Button destination " + (i + 1), placeholder: KIND_HINT[b.kind][1], inputmode: b.kind === "call" ? "tel" : b.kind === "email" ? "email" : "url" });
+          kind.addEventListener("change", function () { b.kind = kind.value; b.value = ""; paintButtons(); touch(); });
+          label.addEventListener("input", function () { b.label = label.value; touch(); });
+          value.addEventListener("input", function () { b.value = value.value; touch(); });
+          btnList.appendChild(h("div", { class: "field btrow" }, [
+            h("div", { class: "hd" }, [kind, h("button", { class: "btn small", type: "button", "aria-label": "Remove button " + (i + 1), text: "Remove", onclick: function () { st.buttons.splice(i, 1); paintButtons(); touch(); } })]),
+            label, value
+          ]));
+        });
+        addBtn.textContent = st.buttons.length ? "Add another button" : "Add a button";
+        addBtn.hidden = st.buttons.length >= MAXB;
+      }
       var ig = bind(h("input", { id: "f-ig", type: "text", value: st.instagramRaw, autocomplete: "off", autocapitalize: "none", spellcheck: "false", placeholder: "@handle or link" }), "instagramRaw");
 
       // colour
@@ -452,8 +552,18 @@
         var u2 = normUrl(st.mapUrl); if (!u2.ok) return err(map, "Enter a link that starts with https://");
         var w = normWa(st.whatsappRaw); if (!w.ok) return err(wa, "Enter a valid WhatsApp number.");
         var i = normIg(st.instagramRaw); if (!i.ok) return err(ig, "Enter an Instagram handle like @shopname, or a link.");
+        var wb = normUrl(st.website); if (!wb.ok) return err(website, "Enter a website like www.yourshop.com");
+        var btns = [], bi;
+        for (bi = 0; bi < st.buttons.length; bi++) {
+          var b = st.buttons[bi], rowIn = btnList.querySelectorAll(".btrow")[bi].querySelectorAll("input"), bl = String(b.label || "").trim(), bv = String(b.value || "").trim(), nv;
+          if (!bl) return err(rowIn[0], "Give button " + (bi + 1) + " a name.");
+          if (b.kind === "link") { nv = normUrl(bv); if (!nv.ok || !nv.value) return err(rowIn[1], "Enter a link like www.yourshop.com/menu"); bv = nv.value; }
+          else if (b.kind === "call") { nv = normWa(bv); if (!nv.ok || !nv.value) return err(rowIn[1], "Enter a valid phone number."); bv = nv.value; }
+          else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(bv)) return err(rowIn[1], "Enter a valid email address.");
+          btns.push({ kind: b.kind, label: bl, value: bv });
+        }
         var body = { slug: isNew ? sg : st.slug, name: nm, address: st.address.trim(), color: st.color, reviewUrl: u1.value, mapUrl: u2.value,
-          whatsapp: w.value, instagram: i.value, gameOn: !!st.gameOn, active: !!st.active };
+          whatsapp: w.value, instagram: i.value, website: wb.value, buttons: btns, gameOn: !!st.gameOn, active: !!st.active };
         if (st.logoChanged) { body.logo = st.logo; body.logoThumb = st.logoThumb; }
         saveBtn.disabled = true; saveBtn.textContent = "Saving...";
         guarded(rpc("sq_admin_save", { p_key: adminKey, p_shop: body }), function (e) { toast(errText(e), true); }).then(function (r) {
@@ -465,7 +575,7 @@
       });
 
       var kids = [
-        h("div", { class: "top" }, [h("a", { class: "back", href: "#/" }, [icon(ICONS.back, 20), "Shops"])]),
+        h("div", { class: "top" }, [h("a", { class: "back", href: "#/shops" }, [icon(ICONS.back, 20), "Shops"])]),
         h("div", { class: "top", style: "min-height:0;margin-bottom:8px" }, [h("h1", { text: isNew ? "New shop" : (src.name || "Shop") })]),
         pv,
         h("div", { class: "card" }, [h("h2", { text: "Shop" }),
@@ -481,7 +591,11 @@
           field("Location link", "f-map", map, "Empty uses a Google Maps search for the shop name and address."),
           field("WhatsApp number", "f-wa", wa, waHint),
           field("Instagram", "f-ig", ig, "Empty hides the Instagram button."),
+          field("Website", "f-web", website, "Optional. Empty hides the website button."),
           toggle("gameOn", "Quick game button", "A fun spin wheel. Nothing is saved.")]),
+        h("div", { class: "card" }, [h("h2", { text: "More buttons" }),
+          h("p", { class: "muted", style: "margin:-4px 0 14px", text: "Add your own buttons, up to 6: menu, booking, offers, call, email." }),
+          btnList, addBtn]),
         h("div", { class: "card" }, [h("h2", { text: "Status" }), toggle("active", "Page is live", "Turn off to pause the page. The QR shows a short break message.")])
       ];
 
@@ -496,7 +610,11 @@
             if (r === FAIL) return;
             var c = r.counts || {}, max = Math.max.apply(null, r.daily.map(function (d) { return d.views; }).concat([1]));
             statsBox.innerHTML = "";
-            statsBox.appendChild(h("div", { class: "kv" }, [["view", "Page views"], ["review", "AI review taps"], ["map", "Location taps"], ["whatsapp", "WhatsApp taps"], ["instagram", "Instagram taps"], ["game", "Game opens"]]
+            var rows = [["view", "Page views"], ["review", "AI review taps"], ["map", "Location taps"], ["whatsapp", "WhatsApp taps"], ["instagram", "Instagram taps"]];
+            if (src.website) rows.push(["website", "Website taps"]);
+            (src.buttons || []).forEach(function (b, i) { rows.push(["b" + i, b.label + " taps"]); });
+            rows.push(["game", "Game opens"]);
+            statsBox.appendChild(h("div", { class: "kv" }, rows
               .map(function (p) { return h("div", {}, [h("b", { text: String(c[p[0]] || 0) }), h("span", { text: p[1] })]); })));
             statsBox.appendChild(h("div", { class: "bars", role: "img", "aria-label": "Page views per day, last 14 days" }, r.daily.map(function (d) {
               return h("i", { style: "height:" + Math.max(4, Math.round(d.views / max * 100)) + "%", title: d.d + ": " + d.views });
@@ -521,9 +639,9 @@
         setTimeout(loadStats, 0);
       }
 
-      kids.push(h("div", { class: "bar" }, [h("div", {}, [h("a", { class: "btn", href: "#/", text: "Cancel" }), saveBtn, dirty])]));
+      kids.push(h("div", { class: "bar" }, [h("div", {}, [h("a", { class: "btn", href: "#/shops", text: "Cancel" }), saveBtn, dirty])]));
       screen(kids, { bar: true });
-      paintPreview(); paintSw(); paintLogo();
+      paintPreview(); paintSw(); paintLogo(); paintButtons();
     }
   }
 
@@ -535,7 +653,7 @@
     go.addEventListener("click", function () {
       go.disabled = true; go.textContent = "Deleting...";
       guarded(rpc("sq_admin_delete", { p_key: adminKey, p_slug: shop.slug }), function (e) { toast(errText(e), true); go.textContent = "Delete shop"; go.disabled = false; }).then(function (r) {
-        if (r !== FAIL) { toast("Shop deleted"); location.hash = "#/"; }
+        if (r !== FAIL) { toast("Shop deleted"); location.hash = "#/shops"; }
       });
     });
     wrap.appendChild(h("div", { class: "confirm" }, [
@@ -588,11 +706,12 @@
     if (p[0] === "new") return viewEdit(null);
     if (p[0] === "shop" && p[1]) return viewEdit(decodeURIComponent(p[1]));
     if (p[0] === "settings") return viewSettings();
-    return viewList();
+    if (p[0] === "shops") return viewList();
+    return viewDash();
   }
   window.addEventListener("hashchange", route);
-  window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); deferredInstall = e; if (current === "list" || current === "settings") route(); });
-  window.addEventListener("appinstalled", function () { deferredInstall = null; toast("Installed. Open Smart QR from your home screen."); if (current === "list" || current === "settings") route(); });
+  window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); deferredInstall = e; if (current === "dash" || current === "settings") route(); });
+  window.addEventListener("appinstalled", function () { deferredInstall = null; toast("Installed. Open Smart QR from your home screen."); if (current === "dash" || current === "settings") route(); });
 
   if ("serviceWorker" in navigator) { window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); }); }
   route();

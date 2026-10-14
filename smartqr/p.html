@@ -117,6 +117,11 @@
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="0.7" fill="currentColor"/></svg>
           Follow us on Instagram
         </a>
+        <a class="card long" id="webLink" data-k="website" target="_blank" rel="noopener" hidden>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.9 5.6 3.9 9s-1.3 6.4-3.9 9c-2.6-2.6-3.9-5.6-3.9-9S9.4 5.6 12 3z"/></svg>
+          Visit our website
+        </a>
+        <div id="extra" style="display:flex;flex-direction:column;gap:12px"></div>
         <button class="game" id="playBtn" type="button">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>
           Play a quick game
@@ -181,6 +186,34 @@
         $("stateTitle").textContent = title; $("stateText").textContent = text; $("state").hidden = false;
       }
 
+      var SVGNS = "http://www.w3.org/2000/svg";
+      var KIND_ICON = {
+        link: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1",
+        call: "M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z",
+        email: "M3 6h18v12H3zM3 7l9 7 9-7"
+      };
+      // Owner-defined buttons. Text goes in as text, never as HTML; each link type is rebuilt from clean parts.
+      function buildExtra(list) {
+        var box = $("extra"); box.textContent = "";
+        (Array.isArray(list) ? list : []).slice(0, 6).forEach(function (b, i) {
+          var href = "";
+          if (b && b.kind === "link") href = https(b.value);
+          else if (b && b.kind === "call" && /^[0-9]{8,15}$/.test(b.value || "")) href = "tel:+" + b.value;
+          else if (b && b.kind === "email" && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(b.value || "")) href = "mailto:" + b.value;
+          if (!href || !b.label) return;
+          var a = document.createElement("a"); a.className = "card long"; a.href = href; a.setAttribute("data-k", "b" + i);
+          if (b.kind === "link") { a.target = "_blank"; a.rel = "noopener"; }
+          var svg = document.createElementNS(SVGNS, "svg");
+          ["width:28", "height:28", "viewBox:0 0 24 24", "fill:none", "stroke:currentColor", "stroke-width:1.7", "stroke-linecap:round", "stroke-linejoin:round", "aria-hidden:true"].forEach(function (kv) {
+            var p = kv.split(":"); svg.setAttribute(p[0], p.slice(1).join(":"));
+          });
+          var path = document.createElementNS(SVGNS, "path"); path.setAttribute("d", KIND_ICON[b.kind]); svg.appendChild(path);
+          a.appendChild(svg); a.appendChild(document.createTextNode(String(b.label)));
+          box.appendChild(a);
+        });
+        box.hidden = !box.firstChild;
+      }
+
       function show(s) {
         shop = s;
         setColor(s.color);
@@ -202,6 +235,11 @@
 
         var ig = https(s.instagram);
         $("igLink").hidden = !ig; if (ig) $("igLink").href = ig;
+
+        var web = https(s.website);
+        $("webLink").hidden = !web; if (web) $("webLink").href = web;
+
+        buildExtra(s.buttons);
 
         $("playBtn").hidden = !s.gameOn;
 

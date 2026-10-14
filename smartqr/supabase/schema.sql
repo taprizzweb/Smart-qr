@@ -27,6 +27,8 @@ create table if not exists public.sq_shops (
   map_url     text check (map_url is null or map_url ~ '^https://'),
   whatsapp    text check (whatsapp is null or whatsapp ~ '^[0-9]{8,15}$'),
   instagram   text check (instagram is null or instagram ~ '^https://'),
+  website     text check (website is null or website ~ '^https://'),
+  buttons     jsonb not null default '[]'::jsonb check (jsonb_typeof(buttons) = 'array' and jsonb_array_length(buttons) <= 6),
   game_on     boolean not null default true,
   active      boolean not null default true,
   created_at  timestamptz not null default now(),
@@ -37,10 +39,18 @@ create table if not exists public.sq_shops (
 create table if not exists public.sq_events (
   id         bigserial primary key,
   shop_id    uuid not null references public.sq_shops(id) on delete cascade,
-  kind       text not null check (kind in ('view', 'review', 'map', 'whatsapp', 'instagram', 'game')),
+  kind       text not null check (kind in ('view', 'review', 'map', 'whatsapp', 'instagram', 'website', 'game', 'b0', 'b1', 'b2', 'b3', 'b4', 'b5')),
   created_at timestamptz not null default now()
 );
 create index if not exists sq_events_shop_time on public.sq_events (shop_id, created_at desc);
+
+-- Upgrade path for databases created before the website / extra buttons existed (safe to re-run).
+alter table public.sq_shops add column if not exists website text check (website is null or website ~ '^https://');
+alter table public.sq_shops add column if not exists buttons jsonb not null default '[]'::jsonb
+  check (jsonb_typeof(buttons) = 'array' and jsonb_array_length(buttons) <= 6);
+alter table public.sq_events drop constraint if exists sq_events_kind_check;
+alter table public.sq_events add constraint sq_events_kind_check
+  check (kind in ('view', 'review', 'map', 'whatsapp', 'instagram', 'website', 'game', 'b0', 'b1', 'b2', 'b3', 'b4', 'b5'));
 
 alter table public.sq_settings enable row level security;
 alter table public.sq_shops    enable row level security;
@@ -74,11 +84,36 @@ begin
   end if;
 end $$;
 
+-- Extra buttons: [{label, kind: link|call|email, value}], at most 6. Cleans and validates; raises 'bad_buttons'.
+create or replace function public.sq_clean_buttons(p jsonb) returns jsonb
+language plpgsql immutable as $$
+declare b jsonb; out jsonb := '[]'::jsonb; lbl text; kd text; v text;
+begin
+  if p is null or jsonb_typeof(p) <> 'array' then raise exception 'bad_buttons'; end if;
+  if jsonb_array_length(p) > 6 then raise exception 'bad_buttons'; end if;
+  for b in select * from jsonb_array_elements(p) loop
+    lbl := trim(coalesce(b ->> 'label', '')); kd := coalesce(b ->> 'kind', ''); v := trim(coalesce(b ->> 'value', ''));
+    if length(lbl) < 1 or length(lbl) > 28 then raise exception 'bad_buttons'; end if;
+    if kd = 'link' then
+      if v !~ '^https://[^[:space:]]+$' or length(v) > 500 then raise exception 'bad_buttons'; end if;
+    elsif kd = 'call' then
+      v := regexp_replace(v, '\D', '', 'g');
+      if v !~ '^[0-9]{8,15}$' then raise exception 'bad_buttons'; end if;
+    elsif kd = 'email' then
+      if v !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' or length(v) > 120 then raise exception 'bad_buttons'; end if;
+    else raise exception 'bad_buttons';
+    end if;
+    out := out || jsonb_build_array(jsonb_build_object('label', lbl, 'kind', kd, 'value', v));
+  end loop;
+  return out;
+end $$;
+
 create or replace function public.sq_shop_json(s public.sq_shops, with_logo boolean) returns jsonb
 language sql stable as $$
   select jsonb_build_object(
     'slug', s.slug, 'name', s.name, 'address', s.address, 'color', s.color,
     'reviewUrl', s.review_url, 'mapUrl', s.map_url, 'whatsapp', s.whatsapp, 'instagram', s.instagram,
+    'website', s.website, 'buttons', s.buttons,
     'gameOn', s.game_on, 'active', s.active, 'updatedAt', s.updated_at
   ) || case when with_logo then jsonb_build_object('logo', s.logo) else jsonb_build_object('logoThumb', s.logo_thumb) end
 $$;
@@ -97,7 +132,7 @@ create or replace function public.sq_log(p_slug text, p_kind text) returns void
 language plpgsql volatile security definer set search_path = public, pg_catalog as $$
 declare sid uuid;
 begin
-  if p_kind not in ('view', 'review', 'map', 'whatsapp', 'instagram', 'game') then return; end if;
+  if p_kind not in ('view', 'review', 'map', 'whatsapp', 'instagram', 'website', 'game', 'b0', 'b1', 'b2', 'b3', 'b4', 'b5') then return; end if;
   select id into sid from public.sq_shops where slug = lower(coalesce(p_slug, '')) and active;
   if sid is not null then insert into public.sq_events (shop_id, kind) values (sid, p_kind); end if;
 end $$;
@@ -151,6 +186,8 @@ begin
     map_url    = case when p_shop ? 'mapUrl'    then nullif(trim(p_shop ->> 'mapUrl'), '')    else map_url end,
     whatsapp   = case when p_shop ? 'whatsapp'  then nullif(regexp_replace(coalesce(p_shop ->> 'whatsapp', ''), '\D', '', 'g'), '') else whatsapp end,
     instagram  = case when p_shop ? 'instagram' then nullif(trim(p_shop ->> 'instagram'), '') else instagram end,
+    website    = case when p_shop ? 'website'   then nullif(trim(p_shop ->> 'website'), '')   else website end,
+    buttons    = case when p_shop ? 'buttons'   then sq_clean_buttons(p_shop -> 'buttons')    else buttons end,
     game_on    = case when p_shop ? 'gameOn'    then (p_shop ->> 'gameOn')::boolean           else game_on end,
     active     = case when p_shop ? 'active'    then (p_shop ->> 'active')::boolean           else active end,
     updated_at = now()
@@ -185,6 +222,32 @@ begin
   );
 end $$;
 
+-- Dashboard: totals across every shop for the last p_days days.
+create or replace function public.sq_admin_overview(p_key text, p_days int default 30) returns jsonb
+language plpgsql stable security definer set search_path = public, pg_catalog as $$
+declare d int := least(greatest(coalesce(p_days, 30), 1), 365); since timestamptz;
+begin
+  perform sq_require_admin(p_key);
+  since := now() - make_interval(days => d);
+  return jsonb_build_object(
+    'days', d,
+    'shops', (select count(*) from public.sq_shops),
+    'live', (select count(*) from public.sq_shops where active),
+    'counts', (select coalesce(jsonb_object_agg(kind, n), '{}'::jsonb) from (
+                 select case when kind ~ '^b[0-9]$' then 'custom' else kind end as kind, count(*) n
+                 from public.sq_events where created_at >= since group by 1) t),
+    'daily', (select coalesce(jsonb_agg(jsonb_build_object('d', to_char(g, 'YYYY-MM-DD'),
+                'views', (select count(*) from public.sq_events e where e.kind = 'view' and e.created_at::date = g)) order by g), '[]'::jsonb)
+              from generate_series(current_date - 13, current_date, interval '1 day') g),
+    'top', (select coalesce(jsonb_agg(t order by t.views desc, t.name), '[]'::jsonb) from (
+              select s.slug, s.name, s.active,
+                     count(*) filter (where e.kind = 'view') as views,
+                     count(*) filter (where e.kind <> 'view') as taps
+              from public.sq_shops s left join public.sq_events e on e.shop_id = s.id and e.created_at >= since
+              group by s.id order by views desc, s.name limit 5) t)
+  );
+end $$;
+
 -- ---------------------------------------------------------------- grants: only the public API is callable
 do $$
 declare f text;
@@ -203,7 +266,8 @@ begin
       public.sq_admin_get(text, text),
       public.sq_admin_save(text, jsonb),
       public.sq_admin_delete(text, text),
-      public.sq_admin_stats(text, text, int)
+      public.sq_admin_stats(text, text, int),
+      public.sq_admin_overview(text, int)
     to anon, authenticated;
   end if;
 end $$;

@@ -19,4 +19,6 @@ Static site, no build step. Data lives in Supabase behind `security definer` fun
 
 ## Admin
 
-Create a shop (name, address, colour, logo photo, review/map/WhatsApp/Instagram links, game on/off, live/paused), see page views and taps, copy the link, download the QR. Wrong keys are slowed and refused by the database.
+Dashboard with totals across all shops (views, button taps, top shops). Create a shop (name, address, colour, logo photo, review/map/WhatsApp/Instagram, optional website, up to 6 of your own extra buttons (open a link, phone call, email), game on/off, live/paused), see page views and taps, copy the link, download the QR. Wrong keys are slowed and refused by the database.
+
+Upgrading an existing database: run `supabase/schema.sql` again. It adds the new columns safely.
