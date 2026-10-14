@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crazy Deal Spin</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <h1 id="storeName"></h1>
+      <p class="branch" id="branch"></p>
+      <p class="tagline" id="tagline"></p>
+    </header>
+
+    <section class="card" id="gameCard">
+      <div class="wheel-wrap">
+        <div class="pointer"></div>
+        <canvas id="wheel" width="600" height="600" aria-label="Spin wheel"></canvas>
+        <div class="hub"></div>
+      </div>
+      <button class="primary" id="spinBtn" type="button">Spin the wheel</button>
+      <p class="hint">Ek phone se din mein ek hi baar spin hoga.</p>
+    </section>
+
+    <section class="card coupon hidden" id="couponCard">
+      <p class="won">Congratulations! Aapne jeeta</p>
+      <p class="prize" id="prizeLabel"></p>
+      <div class="code" id="couponCode"></div>
+      <p class="terms" id="terms"></p>
+    </section>
+
+    <nav class="actions hidden" id="actions">
+      <a class="btn review" id="reviewBtn" target="_blank" rel="noopener">Review likho (AI se aasaan)</a>
+      <a class="btn wa" id="waBtn" target="_blank" rel="noopener">WhatsApp par baat karo</a>
+      <a class="btn ig" id="igBtn" target="_blank" rel="noopener">Instagram par follow karo</a>
+    </nav>
+
+    <footer class="footer">
+      Powered by <a href="https://taprizz.in" target="_blank" rel="noopener">taprizz.in</a>
+    </footer>
+  </main>
+
+  <script src="stores.js"></script>
+  <script src="assets/coupon.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

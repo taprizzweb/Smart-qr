@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Coupon Verify</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <h1>Coupon verify</h1>
+      <p class="branch">Cashier ke liye</p>
+    </header>
+
+    <section class="card">
+      <form id="form" autocomplete="off">
+        <div class="field">
+          <label for="code">Customer ka coupon code</label>
+          <input id="code" name="code" placeholder="DEMO-261014-0-AB12" inputmode="text" autocapitalize="characters">
+        </div>
+        <button class="primary" type="submit">Check karo</button>
+      </form>
+      <div id="result" class="result hidden" role="status"></div>
+      <button id="useBtn" class="secondary hidden" type="button">Used mark karo</button>
+    </section>
+
+    <footer class="footer">
+      Powered by <a href="https://taprizz.in" target="_blank" rel="noopener">taprizz.in</a>
+    </footer>
+  </main>
+
+  <script src="stores.js"></script>
+  <script src="assets/coupon.js"></script>
+  <script>
+    (function () {
+      var USED_KEY = "taprizz:used";
+      function used() { try { return JSON.parse(localStorage.getItem(USED_KEY) || "{}"); } catch (e) { return {}; } }
+      function markUsed(code) { var u = used(); u[code] = Date.now(); try { localStorage.setItem(USED_KEY, JSON.stringify(u)); } catch (e) {} }
+
+      var result = document.getElementById("result");
+      var useBtn = document.getElementById("useBtn");
+      var current = null;
+
+      function show(cls, html) {
+        result.className = "result " + cls;
+        result.innerHTML = html;
+      }
+      function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+      document.getElementById("form").addEventListener("submit", function (e) {
+        e.preventDefault();
+        useBtn.classList.add("hidden");
+        current = null;
+        var res = Coupon.verify(window.STORES, document.getElementById("code").value);
+        if (!res.ok) { show("bad", "<strong>Invalid:</strong> " + esc(res.reason)); return; }
+        var info = "<strong>" + esc(res.prize.label) + "</strong><br>" +
+          esc(res.store.name) + " &middot; " + esc(res.store.branch) + "<br>" +
+          "Valid till " + Coupon.fmt(res.expires);
+        var usedAt = used()[res.code];
+        if (usedAt) {
+          show("warn", "<strong>Pehle use ho chuka hai</strong> (is device par " + new Date(usedAt).toLocaleString() + ").<br>" + info);
+          return;
+        }
+        show("ok", "<strong>Valid coupon</strong><br>" + info);
+        current = res.code;
+        useBtn.classList.remove("hidden");
+      });
+
+      useBtn.addEventListener("click", function () {
+        if (!current) return;
+        markUsed(current);
+        show("warn", "Used mark ho gaya: " + esc(current));
+        useBtn.classList.add("hidden");
+        current = null;
+      });
+    })();
+  </script>
+</body>
+</html>
