@@ -1,5 +1,5 @@
 // Coupon banana aur verify karna. Index aur verify page dono yahi use karte hain.
-// Note: ye client-side signature hai, casual misuse rokne ke liye. Strong fraud-proofing ke liye server chahiye.
+// Note: this is a client-side signature. It deters casual misuse; strong fraud-proofing needs a server.
 (function () {
   function fnv(str) {
     var h = 0x811c9dc5;
@@ -44,17 +44,17 @@
   function verify(stores, raw) {
     var code = (raw || "").trim().toUpperCase();
     var m = /^([A-Z0-9]{3,8})-(\d{6})-(\d{1,2})-([A-Z0-9]{4})$/.exec(code);
-    if (!m) return { ok: false, reason: "Code ka format galat hai." };
+    if (!m) return { ok: false, reason: "Invalid code format." };
     var store = findStore(stores, m[1]);
-    if (!store) return { ok: false, reason: "Ye code kisi store ka nahi hai." };
-    if (sign(m[1] + "-" + m[2] + "-" + m[3]) !== m[4]) return { ok: false, reason: "Code asli nahi hai." };
+    if (!store) return { ok: false, reason: "This code does not belong to any store." };
+    if (sign(m[1] + "-" + m[2] + "-" + m[3]) !== m[4]) return { ok: false, reason: "This code is not authentic." };
     var prize = store.prizes[+m[3]];
-    if (!prize) return { ok: false, reason: "Prize nahi mila." };
+    if (!prize) return { ok: false, reason: "Prize not found." };
     var issued = parseYmd(m[2]);
     var expires = addDays(issued, store.validDays || 30);
     var endOfExpiry = new Date(expires.getFullYear(), expires.getMonth(), expires.getDate(), 23, 59, 59);
     var res = { ok: true, code: code, store: store, prize: prize, issued: issued, expires: expires };
-    if (new Date() > endOfExpiry) { res.ok = false; res.reason = "Coupon expire ho chuka hai."; }
+    if (new Date() > endOfExpiry) { res.ok = false; res.reason = "This coupon has expired."; }
     return res;
   }
 

@@ -2,47 +2,77 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Crazy Deal Spin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0d">
   <meta name="robots" content="noindex">
+  <title>Spin to Win</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
   <main class="page">
     <header class="hero">
+      <p class="eyebrow">Exclusive in-store reward</p>
       <h1 id="storeName"></h1>
       <p class="branch" id="branch"></p>
       <p class="tagline" id="tagline"></p>
     </header>
 
-    <section class="card" id="gameCard">
+    <section class="card" id="gameCard" aria-labelledby="spinBtn">
       <div class="wheel-wrap">
-        <div class="pointer"></div>
-        <canvas id="wheel" width="600" height="600" aria-label="Spin wheel"></canvas>
+        <svg class="pointer" viewBox="0 0 28 36" aria-hidden="true">
+          <path d="M14 36 2.5 15.5A14 14 0 1 1 25.5 15.5Z" fill="#f4f1ea"/>
+          <circle cx="14" cy="13" r="4.5" fill="#0a0a0d"/>
+        </svg>
+        <canvas id="wheel" width="800" height="800" role="img" aria-label="Prize wheel"></canvas>
         <div class="hub"></div>
       </div>
       <button class="primary" id="spinBtn" type="button">Spin the wheel</button>
-      <p class="hint">Ek phone se din mein ek hi baar spin hoga.</p>
+      <p class="hint">One spin per visit. Reward valid at this branch only.</p>
     </section>
 
-    <section class="card coupon hidden" id="couponCard">
-      <p class="won">Congratulations! Aapne jeeta</p>
-      <p class="prize" id="prizeLabel"></p>
-      <div class="code" id="couponCode"></div>
-      <p class="terms" id="terms"></p>
+    <section class="ticket hidden" id="couponCard" aria-live="polite">
+      <div class="ticket-top">
+        <p class="eyebrow" id="ticketEyebrow">You won</p>
+        <h2 class="prize" id="prizeLabel"></h2>
+        <p class="prize-note" id="prizeNote"></p>
+      </div>
+      <hr class="rule">
+      <div class="ticket-bottom">
+        <div class="code-row">
+          <span class="code" id="couponCode"></span>
+          <button class="copy" id="copyBtn" type="button">Copy</button>
+        </div>
+        <dl class="meta-grid">
+          <div><dt>Valid at</dt><dd id="validAt"></dd></div>
+          <div><dt>Expires</dt><dd id="expires"></dd></div>
+        </dl>
+        <p class="terms">Show this code at billing. Take a screenshot to keep it handy.</p>
+      </div>
     </section>
 
-    <nav class="actions hidden" id="actions">
-      <a class="btn review" id="reviewBtn" target="_blank" rel="noopener">Review likho (AI se aasaan)</a>
-      <a class="btn wa" id="waBtn" target="_blank" rel="noopener">WhatsApp par baat karo</a>
-      <a class="btn ig" id="igBtn" target="_blank" rel="noopener">Instagram par follow karo</a>
+    <nav class="actions hidden" id="actions" aria-label="More from this store">
+      <p class="section-label">While you are here</p>
+      <a class="btn review" id="reviewBtn" target="_blank" rel="noopener">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.2 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/></svg>
+        Share your experience
+      </a>
+      <a class="btn secondary" id="waBtn" target="_blank" rel="noopener">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 20.5l1.7-5.4A8.4 8.4 0 1 1 21 11.5Z"/></svg>
+        Chat on WhatsApp
+      </a>
+      <a class="btn secondary" id="igBtn" target="_blank" rel="noopener">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="0.6" fill="currentColor"/></svg>
+        Follow on Instagram
+      </a>
     </nav>
 
     <footer class="footer">
       Powered by <a href="https://taprizz.in" target="_blank" rel="noopener">taprizz.in</a>
     </footer>
   </main>
+
+  <canvas id="confetti" aria-hidden="true"></canvas>
 
   <script src="stores.js"></script>
   <script src="assets/coupon.js"></script>

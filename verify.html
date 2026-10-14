@@ -2,29 +2,31 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Coupon Verify</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0d">
   <meta name="robots" content="noindex">
+  <title>Verify Coupon</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
   <main class="page">
     <header class="hero">
-      <h1>Coupon verify</h1>
-      <p class="branch">Cashier ke liye</p>
+      <p class="eyebrow">Staff only</p>
+      <h1>Verify coupon</h1>
+      <p class="branch">Check a customer's code before applying the discount.</p>
     </header>
 
     <section class="card">
       <form id="form" autocomplete="off">
         <div class="field">
-          <label for="code">Customer ka coupon code</label>
-          <input id="code" name="code" placeholder="DEMO-261014-0-AB12" inputmode="text" autocapitalize="characters">
+          <label for="code">Coupon code</label>
+          <input id="code" name="code" placeholder="DEMO-261014-0-AB12" autocapitalize="characters" spellcheck="false">
         </div>
-        <button class="primary" type="submit">Check karo</button>
+        <button class="primary" type="submit">Verify coupon</button>
       </form>
-      <div id="result" class="result hidden" role="status"></div>
-      <button id="useBtn" class="secondary hidden" type="button">Used mark karo</button>
+      <div id="result" class="result hidden" role="status" aria-live="polite"></div>
+      <button id="useBtn" class="secondary hidden" type="button">Mark as redeemed</button>
     </section>
 
     <footer class="footer">
@@ -55,16 +57,16 @@
         useBtn.classList.add("hidden");
         current = null;
         var res = Coupon.verify(window.STORES, document.getElementById("code").value);
-        if (!res.ok) { show("bad", "<strong>Invalid:</strong> " + esc(res.reason)); return; }
-        var info = "<strong>" + esc(res.prize.label) + "</strong><br>" +
-          esc(res.store.name) + " &middot; " + esc(res.store.branch) + "<br>" +
-          "Valid till " + Coupon.fmt(res.expires);
+        if (!res.ok) { show("bad", "<strong>Not valid</strong>" + esc(res.reason)); return; }
+        var info = esc(res.prize.label) + "<br>" +
+          esc(res.store.name) + " · " + esc(res.store.branch) + "<br>" +
+          "Valid until " + Coupon.fmt(res.expires);
         var usedAt = used()[res.code];
         if (usedAt) {
-          show("warn", "<strong>Pehle use ho chuka hai</strong> (is device par " + new Date(usedAt).toLocaleString() + ").<br>" + info);
+          show("warn", "<strong>Already redeemed</strong>On this device, " + esc(new Date(usedAt).toLocaleString()) + ".<br>" + info);
           return;
         }
-        show("ok", "<strong>Valid coupon</strong><br>" + info);
+        show("ok", "<strong>Valid coupon</strong>" + info);
         current = res.code;
         useBtn.classList.remove("hidden");
       });
@@ -72,7 +74,7 @@
       useBtn.addEventListener("click", function () {
         if (!current) return;
         markUsed(current);
-        show("warn", "Used mark ho gaya: " + esc(current));
+        show("warn", "<strong>Marked as redeemed</strong>" + esc(current));
         useBtn.classList.add("hidden");
         current = null;
       });

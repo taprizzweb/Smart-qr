@@ -1,21 +1,21 @@
 # Taprizz Crazy Deal
 
-Static spin-wheel deal page for stores. No server, no database, no build step.
+Premium static spin-wheel deal page for stores. No server, no database, no build step.
 
-## Naya store kaise jodein
-1. `stores.js` mein `demo` block copy karke naya key banao (e.g. `cafe-xyz`) aur data badlo.
-   `code` har store ka unique hona chahiye.
-2. Us store ka link: `https://<tumhari-site>/?s=cafe-xyz` — isi link ka QR banao.
-3. Cashier coupon check kare: `https://<tumhari-site>/verify.html`.
+## Add a store
+1. In `stores.js`, copy the `demo` block, give it a new key (e.g. `cafe-xyz`) and edit the details.
+   The `code` must be unique per store.
+2. The store link is `https://<your-site>/?s=cafe-xyz`. Generate the QR from this link.
+3. Cashiers verify coupons at `https://<your-site>/verify.html`.
 
 ## Deploy (free)
-Vercel / Netlify / Cloudflare Pages / GitHub Pages par repo connect karo. Build command ki zarurat nahi, root folder publish hota hai.
+Connect the repo to Vercel, Netlify, Cloudflare Pages or GitHub Pages. No build command is needed; publish the root folder.
 
-## Local chalane ke liye
-`python3 -m http.server 8000` phir `http://localhost:8000/?s=demo`
+## Run locally
+`python3 -m http.server 8000`, then open `http://localhost:8000/?s=demo`.
 
-## Zaroori
-- `stores.js` mein `TAPRIZZ_SALT` live karne se pehle badlo (baad mein nahi).
-- Coupon signature client-side hai: casual misuse rokta hai, strong fraud-proofing nahi. "Used" mark sirf cashier ke device par save hota hai.
-- Spin limit per device hai (localStorage). Naya browser/incognito se dobara spin ho sakta hai.
-- AI review portal ready hone par store ke `aiReviewUrl` mein link daalo; tab tak button Google review link kholta hai.
+## Before going live
+- Change `TAPRIZZ_SALT` in `stores.js` (and never change it afterwards).
+- Coupon signing is client-side. It deters casual misuse but is not strong fraud protection. "Redeemed" is stored only on the cashier's device.
+- The one-spin limit is per browser (localStorage); a new browser or incognito window can spin again.
+- When the AI review portal is ready, put its link in the store's `aiReviewUrl`. Until then the button opens the Google review link.

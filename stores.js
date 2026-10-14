@@ -1,27 +1,27 @@
-// Har store ka data yahin hai. Naya store jodne ke liye ek block copy karo aur badlo.
-// Store ka link: https://<tumhari-site>/?s=<store-key>   (QR isi link ka banega)
+// All store data lives here. To add a store, copy a block and edit it.
+// Store link: https://<your-site>/?s=<store-key>   (generate the QR from this link)
 
-// Coupon signature ke liye secret. Isse apna kuch random rakho aur live karne ke baad mat badlo
-// (badalne par purane coupons invalid ho jayenge).
+// Secret used to sign coupons. Set it to something random before going live and never change it
+// afterwards (changing it invalidates every coupon already issued).
 window.TAPRIZZ_SALT = "change-me-before-going-live";
 
 window.STORES = {
   demo: {
-    code: "DEMO",                         // sirf A-Z / 0-9, 3-8 characters, har store ka unique
+    code: "DEMO",                         // A-Z / 0-9 only, 3-8 characters, unique per store
     name: "Demo Cafe",
     branch: "Pacific Mall, Jaipur",
-    tagline: "Spin karo, crazy deal jeeto!",
-    color: "#e11d48",                    // brand color
-    validDays: 30,                       // coupon kitne din valid rahega
-    minPurchaseNote: "Agli purchase par valid",
-    whatsapp: "919999999999",            // country code ke saath, + ya space ke bina
-    whatsappMsg: "Hi! Mujhe Demo Cafe ke baare mein jaanna hai.",
+    tagline: "Spin the wheel. Unlock a crazy deal.",
+    color: "#e11d48",                    // brand colour (the single accent used across the page)
+    validDays: 30,                       // days a coupon stays valid
+    minPurchaseNote: "Redeem it on your next visit",
+    whatsapp: "919999999999",            // with country code, no + or spaces
+    whatsappMsg: "Hi! I would like to know more about Demo Cafe.",
     instagram: "https://instagram.com/",
     googleReviewUrl: "https://search.google.com/local/writereview?placeid=YOUR_PLACE_ID",
-    aiReviewUrl: "",                     // AI review portal ka link ready hone par yahan daalo
+    aiReviewUrl: "",                     // paste the AI review portal link here when ready
     prizes: [
-      // short = wheel par dikhne wala chhota text, label = jeetne par dikhne wala poora text
-      // weight = kitna zyada, utna zyada milega (relative)
+      // short = text shown on the wheel, label = full text shown when won
+      // weight = relative probability (higher = more likely)
       { short: "10% OFF",  label: "10% off on your next purchase",     weight: 30 },
       { short: "20% OFF",  label: "20% off on your next purchase",     weight: 15 },
       { short: "FREE ITEM", label: "Free add-on with your next order", weight: 10 },
