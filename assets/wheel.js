@@ -77,22 +77,30 @@
       if (spinning) return;
       spinning = true;
       btn.disabled = true;
-      btn.textContent = "Good luck…";
+      btn.textContent = "Good luck\u2026";
 
-      var rec = env.decide();                              // outcome is fixed and saved BEFORE the animation
-      var jitter = (Rand.float() - 0.5) * seg * 0.7;
-      var target = -((rec.idx + 0.5) * seg) + jitter;      // brings the chosen segment under the pointer
-      var deg = (6 * 2 * Math.PI + target) * 180 / Math.PI; // six full turns, then land
-      canvas.style.transform = "rotate(" + deg + "deg)";
+      // The outcome is decided (and saved) BEFORE the animation; in server mode the database decides.
+      env.decide().then(function (rec) {
+        if (rec.already) { env.complete(rec); return; }   // this phone already played: show the same result
+        var jitter = (Rand.float() - 0.5) * seg * 0.7;
+        var target = -((rec.idx + 0.5) * seg) + jitter;      // brings the chosen segment under the pointer
+        var deg = (6 * 2 * Math.PI + target) * 180 / Math.PI; // six full turns, then land
+        canvas.style.transform = "rotate(" + deg + "deg)";
 
-      var done = false;
-      function finish() {
-        if (done) return;
-        done = true;
-        env.complete(rec);
-      }
-      canvas.addEventListener("transitionend", finish, { once: true });
-      setTimeout(finish, env.reduceMotion ? 300 : 5400);   // fallback if transitionend never fires
+        var done = false;
+        function finish() {
+          if (done) return;
+          done = true;
+          env.complete(rec);
+        }
+        canvas.addEventListener("transitionend", finish, { once: true });
+        setTimeout(finish, env.reduceMotion ? 300 : 5400);   // fallback if transitionend never fires
+      }, function (err) {
+        spinning = false;
+        btn.disabled = false;
+        btn.textContent = "Spin the wheel";
+        env.onError(err);
+      });
     });
   }
 

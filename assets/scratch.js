@@ -56,17 +56,35 @@
     }
     paintFoil();
 
-    var rec = null, finished = false;
+    var rec = null, pending = null, finished = false;
 
+    // Outcome is requested on the FIRST touch (saved/decided before anything is written under the foil).
     function decideOnce() {
-      if (rec) return rec;
-      rec = env.decide();                                  // outcome fixed and saved BEFORE anything is shown
-      var p = env.prizes[rec.idx];
-      eyebrow.textContent = p.blank ? "Not this time" : "Your reward";
-      prizeEl.textContent = p.blank ? env.blankMessage : p.label;
-      under.classList.add("is-ready");
-      return rec;
+      if (pending) return pending;
+      pending = env.decide().then(function (r) {
+        rec = r;
+        if (r.already) {                       // this phone already played: skip straight to the same result
+          finished = true;
+          foil.classList.add("is-gone");
+          revealBtn.classList.add("hidden");
+          env.complete(r);
+          return r;
+        }
+        var p = env.prizes[r.idx];
+        eyebrow.textContent = p.blank ? "Not this time" : "Your reward";
+        prizeEl.textContent = p.blank ? env.blankMessage : p.label;
+        under.classList.add("is-ready");
+        return r;
+      }, function (err) {
+        pending = null;                        // allow another try
+        drawing = false;
+        env.onError(err);
+        throw err;
+      });
+      return pending;
     }
+
+    var drawing = false;
 
     function revealedFraction() {
       var d = ctx.getImageData(0, 0, W, H).data;
@@ -82,14 +100,16 @@
 
     function finish() {
       if (finished) return;
-      finished = true;
-      decideOnce();
-      foil.classList.add("is-gone");
-      revealBtn.classList.add("hidden");
-      setTimeout(function () { env.complete(rec); }, env.reduceMotion ? 100 : 750);
+      decideOnce().then(function (r) {
+        if (finished) return;
+        finished = true;
+        foil.classList.add("is-gone");
+        revealBtn.classList.add("hidden");
+        setTimeout(function () { env.complete(r); }, env.reduceMotion ? 100 : 750);
+      }, function () { /* error already shown */ });
     }
 
-    var drawing = false, last = null, moves = 0;
+    var last = null, moves = 0;
     function pos(e) {
       var r = foil.getBoundingClientRect();
       return { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) };
@@ -103,7 +123,7 @@
 
     foil.addEventListener("pointerdown", function (e) {
       if (finished) return;
-      decideOnce();
+      decideOnce().catch(function () { /* error already shown */ });
       drawing = true; last = pos(e);
       try { foil.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
       stroke(last, last);

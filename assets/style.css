@@ -539,3 +539,42 @@ button:focus-visible, .btn:focus-visible, input:focus-visible, a:focus-visible {
   overflow-x: auto;
   white-space: pre;
 }
+
+.hint.is-error { color: #fecaca; }
+
+/* ---------- owner dashboard ---------- */
+.status { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px; }
+.status .hint { margin: 2px 0 0; }
+.status-title { margin: 0; font-size: 1.25rem; line-height: 1.25; font-weight: 600; letter-spacing: -0.01em; }
+.status > div { flex: 1; min-width: 0; }
+.admin.status button, .admin.status button.secondary, .admin.status button.primary { width: auto; flex: none; min-height: 44px; padding: 0 16px; }
+
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+@media (min-width: 560px) { .stats { grid-template-columns: repeat(4, 1fr); } }
+.stat { background: var(--canvas); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+.stat-value { font-size: 2rem; line-height: 1.15; font-weight: 600; letter-spacing: -0.02em; }
+.stat-label { margin-top: 4px; font-size: 0.75rem; line-height: 1.4; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+
+.bars { display: flex; align-items: flex-end; gap: 4px; height: 96px; padding: 10px; background: var(--canvas); border: 1px solid var(--border); border-radius: 14px; }
+.bar { flex: 1; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 3px; }
+.bar-axis { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.75rem; color: var(--muted); }
+
+.slot { padding: 14px 14px 2px; margin-bottom: 12px; background: var(--canvas); border: 1px solid var(--border); border-radius: 14px; }
+.slot-title { margin: 0 0 10px; font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.slot-row { display: grid; grid-template-columns: 1fr; gap: 0 12px; }
+@media (min-width: 480px) { .slot-row { grid-template-columns: 1fr 1fr; } }
+
+.rows { border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 12px; background: var(--canvas); }
+.row { padding: 14px 16px; display: grid; gap: 2px; }
+.row + .row { border-top: 1px solid var(--border); }
+.row-main { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.row-title { font-size: 1rem; font-weight: 500; }
+.row-link { font-size: 0.875rem; color: var(--text); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--border-strong); }
+.row-sub { font-size: 0.875rem; line-height: 1.5; color: var(--text); opacity: 0.88; }
+.row-sub.inline { color: var(--muted); }
+.row-meta { font-size: 0.75rem; line-height: 1.4; color: var(--muted); }
+.empty { margin: 0; padding: 18px 16px; font-size: 0.875rem; color: var(--muted); }
+.admin .primary, .admin .secondary { width: 100%; }
+.admin .result div { margin-top: 2px; }
+.break { word-break: break-all; font-family: var(--mono); font-size: 0.75rem; line-height: 1.5; margin: 8px 0; }
+#ownerBox .secondary { margin-top: 8px; }

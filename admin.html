@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0a0a0d">
-  <meta name="robots" content="noindex">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
   <title>Store Setup</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="assets/style.css">
@@ -14,7 +15,7 @@
     <header class="hero">
       <p class="eyebrow">Taprizz setup</p>
       <h1>Create a store</h1>
-      <p class="branch">Fill the form, preview it, then copy the block into <code>stores.js</code>.</p>
+      <p class="branch">Fill the form, preview it, then publish. The owner gets a private link to manage offers and see reports.</p>
     </header>
 
     <form id="admin" class="card admin" autocomplete="off" novalidate>
@@ -31,16 +32,15 @@
       <h2 class="card-title">Game</h2>
       <div class="grid2">
         <div class="field"><label for="game">Game type</label>
-          <select id="game"><option value="wheel">Spin wheel</option><option value="scratch">Scratch card</option></select></div>
+          <select id="game"><option value="wheel">Spin wheel (4 slots)</option><option value="scratch">Scratch card</option></select></div>
         <div class="field"><label for="validDays">Coupon valid for (days)</label><input id="validDays" type="number" min="1" value="30"></div>
         <div class="field"><label for="cooldown">Blank result: play again after (hours)</label><input id="cooldown" type="number" min="0" value="24"></div>
         <div class="field"><label for="blankMessage">Message on a blank result</label><input id="blankMessage" value="Better luck next time"></div>
       </div>
 
-      <h2 class="card-title">Deals</h2>
-      <p class="hint left">Leave the deal text empty to make a blank slot (no reward). Weight sets how likely each slot is.</p>
-      <div id="prizes" class="prizes"></div>
-      <button type="button" class="secondary add" id="addPrize">Add a slot</button>
+      <h2 class="card-title">Starting offers (the owner can change these later)</h2>
+      <p class="hint left">Four slots. Leave a deal empty to make it a no-reward slot. Chances must add up to 100%.</p>
+      <div id="prizes"></div>
       <p class="hint left" id="oddsNote"></p>
 
       <h2 class="card-title">Links</h2>
@@ -51,30 +51,50 @@
         <div class="field"><label for="googleReviewUrl">Google review URL (fallback)</label><input id="googleReviewUrl" placeholder="https://search.google.com/local/writereview?placeid=..."></div>
       </div>
 
-      <h2 class="card-title">What the owner receives</h2>
-      <label class="check"><input type="checkbox" id="collectLead"> Ask the customer for name and phone before playing</label>
-      <div class="field"><label for="sheetWebhook">Google Sheet webhook URL (every play is logged there)</label><input id="sheetWebhook" placeholder="https://script.google.com/macros/s/.../exec"></div>
+      <label class="check"><input type="checkbox" id="collectLead" checked> Ask the customer for name and phone before playing</label>
     </form>
 
-    <section class="card admin">
-      <h2 class="card-title">Output</h2>
+    <section class="card admin" id="serverCard">
+      <h2 class="card-title">Publish</h2>
       <p class="error hidden" id="problems" role="alert"></p>
       <div class="field"><label for="base">Your site URL</label><input id="base" placeholder="https://yourdomain.com"></div>
-      <div class="field"><label>Customer link</label><input id="link" readonly></div>
-      <div class="btn-row">
-        <button type="button" class="primary" id="previewBtn">Preview</button>
-        <button type="button" class="secondary" id="copyCfg">Copy store block</button>
-      </div>
+      <div class="field"><label>Customer link (put this QR on the counter)</label><input id="link" readonly></div>
       <div class="qr-row">
         <div id="qr" class="qr"></div>
         <button type="button" class="secondary" id="dlQr">Download QR</button>
       </div>
-      <p class="hint left">Paste the block inside <code>window.STORES = { ... }</code> in <code>stores.js</code>, then deploy.</p>
-      <pre id="out" class="out" tabindex="0"></pre>
+      <button type="button" class="secondary" id="previewBtn">Preview</button>
+
+      <div id="serverOnly">
+        <div class="field" style="margin-top:20px"><label for="master">Admin key</label><input id="master" type="password" autocomplete="off" placeholder="Your private admin key"></div>
+        <button type="button" class="primary" id="publishBtn">Publish to server</button>
+        <p class="hint left" id="publishMsg" role="status"></p>
+        <div id="ownerBox" class="result ok hidden">
+          <strong>Owner link</strong>
+          <div id="ownerLink" class="break"></div>
+          <div class="hint left">Send this privately to the store owner. It is shown only once; you can create a new one anytime.</div>
+          <button type="button" class="secondary" id="copyOwner">Copy owner link</button>
+        </div>
+      </div>
+      <p class="hint left hidden" id="noServer">Server is not connected, so publishing is off. You can still copy the static block below into <code>stores.js</code>.</p>
+    </section>
+
+    <section class="card admin hidden" id="storesCard">
+      <h2 class="card-title">Stores on the server</h2>
+      <div class="rows" id="storeList"></div>
+    </section>
+
+    <section class="card admin">
+      <h2 class="card-title">Static block (no server)</h2>
+      <p class="hint left">Optional. Paste inside <code>window.STORES = { ... }</code> in <code>stores.js</code> if you are not using the server.</p>
+      <button type="button" class="secondary" id="copyCfg">Copy static block</button>
+      <pre id="out" class="out" tabindex="0" style="margin-top:12px"></pre>
     </section>
   </main>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="stores.js"></script>
+  <script src="assets/api.js"></script>
   <script src="assets/admin.js"></script>
 </body>
 </html>

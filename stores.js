@@ -5,6 +5,11 @@
 // afterwards (changing it invalidates every coupon already issued).
 window.TAPRIZZ_SALT = "change-me-before-going-live";
 
+// Optional server mode (owner dashboards, central redemption, server-side random).
+// Paste your Supabase project URL and publishable (anon) key. Leave empty to stay fully static.
+// Stores created in admin.html live in the database; stores listed below stay static.
+window.TAPRIZZ_API = { url: "", anonKey: "" };
+
 window.STORES = {
   // ---------- Spin wheel example ----------
   demo: {
@@ -26,14 +31,12 @@ window.STORES = {
     googleReviewUrl: "https://search.google.com/local/writereview?placeid=YOUR_PLACE_ID",
     aiReviewUrl: "",                     // paste the AI review portal link here when ready
     prizes: [
-      // label = full text shown when won. LEAVE IT EMPTY to make a blank slot (no reward).
-      // short = text on the wheel (optional). weight = relative chance (higher = more likely, 0 = never).
-      { label: "10% off on your next purchase",     short: "10% OFF",     weight: 25 },
-      { label: "20% off on your next purchase",     short: "20% OFF",     weight: 12 },
-      { label: "Free add-on with your next order",  short: "FREE ITEM",   weight: 8 },
-      { label: "",                                  short: "NEXT TIME",   weight: 40 },
-      { label: "Crazy deal: 30% off next purchase", short: "30% OFF",     weight: 3 },
-      { label: "Buy 1 Get 1 on your next visit",    short: "BUY 1 GET 1", weight: 12 }
+      // Exactly 4 slots. label = full text shown when won. LEAVE IT EMPTY to make a blank slot (no reward).
+      // short = text on the wheel (optional, max 14 chars). weight = relative chance (0 = never).
+      { label: "Pick any item at cost price",        short: "AT COST",     weight: 10 },
+      { label: "Flat 1% off on your next purchase",  short: "1% OFF",      weight: 30 },
+      { label: "Free add-on with your next order",   short: "FREE ADD-ON", weight: 10 },
+      { label: "",                                   short: "NEXT TIME",   weight: 50 }
     ]
   },
 
@@ -57,10 +60,10 @@ window.STORES = {
     googleReviewUrl: "",
     aiReviewUrl: "",
     prizes: [
-      { label: "15% off your next service", weight: 25 },
-      { label: "Free hair spa with any service", weight: 6 },
-      { label: "", weight: 55 },
-      { label: "Flat ₹200 off your next visit", weight: 14 }
+      { label: "Pick any service at cost price",     weight: 10 },
+      { label: "Flat 1% off your next visit",        weight: 30 },
+      { label: "Free hair spa with any service",     weight: 10 },
+      { label: "",                                   weight: 50 }
     ]
   }
 };
