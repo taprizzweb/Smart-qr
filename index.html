@@ -5,12 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0a0a0d">
   <meta name="robots" content="noindex">
-  <title>Spin to Win</title>
+  <title>Crazy Deal</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
   <main class="page">
+    <p class="preview-bar hidden" id="previewBar">Preview mode. Nothing is saved or sent.</p>
+
     <header class="hero">
       <p class="eyebrow">Exclusive in-store reward</p>
       <h1 id="storeName"></h1>
@@ -18,53 +20,70 @@
       <p class="tagline" id="tagline"></p>
     </header>
 
-    <section class="card" id="gameCard" aria-labelledby="spinBtn">
-      <div class="wheel-wrap">
-        <svg class="pointer" viewBox="0 0 28 36" aria-hidden="true">
-          <path d="M14 36 2.5 15.5A14 14 0 1 1 25.5 15.5Z" fill="#f4f1ea"/>
-          <circle cx="14" cy="13" r="4.5" fill="#0a0a0d"/>
-        </svg>
-        <canvas id="wheel" width="800" height="800" role="img" aria-label="Prize wheel"></canvas>
-        <div class="hub"></div>
-      </div>
-      <button class="primary" id="spinBtn" type="button">Spin the wheel</button>
-      <p class="hint">One spin per visit. Reward valid at this branch only.</p>
+    <!-- Step 1 (optional): customer details -->
+    <section class="card hidden" id="gateCard" aria-labelledby="gateTitle">
+      <p class="eyebrow">One quick step</p>
+      <h2 class="card-title" id="gateTitle">Enter your details to play</h2>
+      <form id="leadForm" novalidate>
+        <div class="field">
+          <label for="leadName">Name</label>
+          <input id="leadName" name="name" type="text" autocomplete="name" required>
+        </div>
+        <div class="field">
+          <label for="leadPhone">Mobile number</label>
+          <input id="leadPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="98765 43210" required>
+        </div>
+        <p class="error hidden" id="leadError" role="alert"></p>
+        <button class="primary" type="submit">Continue</button>
+        <p class="hint" id="consent"></p>
+      </form>
     </section>
 
-    <section class="ticket hidden" id="couponCard" aria-live="polite">
+    <!-- Step 2: the game (wheel or scratch card is mounted here) -->
+    <section class="card hidden" id="gameCard">
+      <div id="gameHost"></div>
+      <p class="hint" id="gameHint"></p>
+    </section>
+
+    <!-- Step 3: result -->
+    <section class="ticket hidden" id="resultCard" aria-live="polite">
       <div class="ticket-top">
-        <p class="eyebrow" id="ticketEyebrow">You won</p>
+        <p class="eyebrow" id="ticketEyebrow"></p>
         <h2 class="prize" id="prizeLabel"></h2>
         <p class="prize-note" id="prizeNote"></p>
       </div>
-      <hr class="rule">
-      <div class="ticket-bottom">
-        <div class="code-row">
-          <span class="code" id="couponCode"></span>
-          <button class="copy" id="copyBtn" type="button">Copy</button>
+      <div id="ticketBottomWrap">
+        <hr class="rule">
+        <div class="ticket-bottom">
+          <div class="code-row">
+            <span class="code" id="couponCode"></span>
+            <button class="copy" id="copyBtn" type="button">Copy</button>
+          </div>
+          <dl class="meta-grid">
+            <div><dt>Valid at</dt><dd id="validAt"></dd></div>
+            <div><dt>Expires</dt><dd id="expires"></dd></div>
+          </dl>
+          <p class="terms">Show this code at billing. Take a screenshot to keep it handy.</p>
         </div>
-        <dl class="meta-grid">
-          <div><dt>Valid at</dt><dd id="validAt"></dd></div>
-          <div><dt>Expires</dt><dd id="expires"></dd></div>
-        </dl>
-        <p class="terms">Show this code at billing. Take a screenshot to keep it handy.</p>
       </div>
     </section>
 
-    <nav class="actions hidden" id="actions" aria-label="More from this store">
-      <p class="section-label">While you are here</p>
-      <a class="btn review" id="reviewBtn" target="_blank" rel="noopener">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.2 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/></svg>
-        Share your experience
-      </a>
-      <a class="btn secondary" id="waBtn" target="_blank" rel="noopener">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 20.5l1.7-5.4A8.4 8.4 0 1 1 21 11.5Z"/></svg>
-        Chat on WhatsApp
-      </a>
-      <a class="btn secondary" id="igBtn" target="_blank" rel="noopener">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="0.6" fill="currentColor"/></svg>
-        Follow on Instagram
-      </a>
+    <nav class="hidden" id="actions" aria-label="More from this store">
+      <p class="section-label">Stay connected</p>
+      <div class="link-list">
+        <a class="link-row" id="reviewBtn" target="_blank" rel="noopener">
+          <span class="link-text"><span class="link-title">AI review</span><span class="link-sub">Click to write yours in seconds</span></span>
+          <svg class="arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+        </a>
+        <a class="link-row" id="igBtn" target="_blank" rel="noopener">
+          <span class="link-text"><span class="link-title">Instagram</span><span class="link-sub">Follow for offers and new arrivals</span></span>
+          <svg class="arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+        </a>
+        <a class="link-row" id="waBtn" target="_blank" rel="noopener">
+          <span class="link-text"><span class="link-title">WhatsApp</span><span class="link-sub">Chat with the store directly</span></span>
+          <svg class="arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+        </a>
+      </div>
     </nav>
 
     <footer class="footer">
@@ -75,7 +94,10 @@
   <canvas id="confetti" aria-hidden="true"></canvas>
 
   <script src="stores.js"></script>
+  <script src="assets/rand.js"></script>
   <script src="assets/coupon.js"></script>
+  <script src="assets/wheel.js"></script>
+  <script src="assets/scratch.js"></script>
   <script src="assets/app.js"></script>
 </body>
 </html>

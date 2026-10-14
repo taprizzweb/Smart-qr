@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0d">
+  <meta name="robots" content="noindex">
+  <title>Store Setup</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <main class="page wide">
+    <header class="hero">
+      <p class="eyebrow">Taprizz setup</p>
+      <h1>Create a store</h1>
+      <p class="branch">Fill the form, preview it, then copy the block into <code>stores.js</code>.</p>
+    </header>
+
+    <form id="admin" class="card admin" autocomplete="off" novalidate>
+      <h2 class="card-title">Store</h2>
+      <div class="grid2">
+        <div class="field"><label for="key">Store key (in the link)</label><input id="key" placeholder="cafe-xyz"></div>
+        <div class="field"><label for="code">Coupon prefix (3-8 letters/digits)</label><input id="code" class="code-input" placeholder="CAFEXYZ" maxlength="8"></div>
+        <div class="field"><label for="name">Store name</label><input id="name" placeholder="Cafe XYZ"></div>
+        <div class="field"><label for="branch">Branch</label><input id="branch" placeholder="Pacific Mall, Jaipur"></div>
+        <div class="field"><label for="tagline">Tagline (optional)</label><input id="tagline" placeholder="Spin the wheel. Unlock a crazy deal."></div>
+        <div class="field"><label for="color">Brand colour</label><input id="color" type="color" value="#e11d48"></div>
+      </div>
+
+      <h2 class="card-title">Game</h2>
+      <div class="grid2">
+        <div class="field"><label for="game">Game type</label>
+          <select id="game"><option value="wheel">Spin wheel</option><option value="scratch">Scratch card</option></select></div>
+        <div class="field"><label for="validDays">Coupon valid for (days)</label><input id="validDays" type="number" min="1" value="30"></div>
+        <div class="field"><label for="cooldown">Blank result: play again after (hours)</label><input id="cooldown" type="number" min="0" value="24"></div>
+        <div class="field"><label for="blankMessage">Message on a blank result</label><input id="blankMessage" value="Better luck next time"></div>
+      </div>
+
+      <h2 class="card-title">Deals</h2>
+      <p class="hint left">Leave the deal text empty to make a blank slot (no reward). Weight sets how likely each slot is.</p>
+      <div id="prizes" class="prizes"></div>
+      <button type="button" class="secondary add" id="addPrize">Add a slot</button>
+      <p class="hint left" id="oddsNote"></p>
+
+      <h2 class="card-title">Links</h2>
+      <div class="grid2">
+        <div class="field"><label for="whatsapp">WhatsApp number (with country code)</label><input id="whatsapp" inputmode="tel" placeholder="919876543210"></div>
+        <div class="field"><label for="instagram">Instagram URL</label><input id="instagram" placeholder="https://instagram.com/yourstore"></div>
+        <div class="field"><label for="aiReviewUrl">AI review portal URL</label><input id="aiReviewUrl" placeholder="https://..."></div>
+        <div class="field"><label for="googleReviewUrl">Google review URL (fallback)</label><input id="googleReviewUrl" placeholder="https://search.google.com/local/writereview?placeid=..."></div>
+      </div>
+
+      <h2 class="card-title">What the owner receives</h2>
+      <label class="check"><input type="checkbox" id="collectLead"> Ask the customer for name and phone before playing</label>
+      <div class="field"><label for="sheetWebhook">Google Sheet webhook URL (every play is logged there)</label><input id="sheetWebhook" placeholder="https://script.google.com/macros/s/.../exec"></div>
+    </form>
+
+    <section class="card admin">
+      <h2 class="card-title">Output</h2>
+      <p class="error hidden" id="problems" role="alert"></p>
+      <div class="field"><label for="base">Your site URL</label><input id="base" placeholder="https://yourdomain.com"></div>
+      <div class="field"><label>Customer link</label><input id="link" readonly></div>
+      <div class="btn-row">
+        <button type="button" class="primary" id="previewBtn">Preview</button>
+        <button type="button" class="secondary" id="copyCfg">Copy store block</button>
+      </div>
+      <div class="qr-row">
+        <div id="qr" class="qr"></div>
+        <button type="button" class="secondary" id="dlQr">Download QR</button>
+      </div>
+      <p class="hint left">Paste the block inside <code>window.STORES = { ... }</code> in <code>stores.js</code>, then deploy.</p>
+      <pre id="out" class="out" tabindex="0"></pre>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="assets/admin.js"></script>
+</body>
+</html>

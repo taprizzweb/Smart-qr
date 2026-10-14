@@ -1,10 +1,18 @@
 (function () {
+  "use strict";
+
   var params = new URLSearchParams(location.search);
   var key = (params.get("s") || "demo").toLowerCase();
-  var store = window.STORES[key];
-
+  var preview = key === "__preview";
   var $ = function (id) { return document.getElementById(id); };
   var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var store = null;
+  if (preview) {
+    try { store = JSON.parse(sessionStorage.getItem("taprizz:preview")); } catch (e) { /* ignore */ }
+  } else {
+    store = window.STORES[key];
+  }
 
   if (!store) {
     document.querySelector(".page").innerHTML =
@@ -14,161 +22,143 @@
   }
 
   var ACCENT = store.color || "#e11d48";
-  var INK = "#15151b";
   var IVORY = "#f4f1ea";
-  var FONT = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+  var GAME = Games[store.game] ? store.game : "wheel";
+  var BLANK_MESSAGE = store.blankMessage || "Better luck next time";
 
-  // ---------- page setup ----------
-  document.title = store.name + " | Spin to Win";
+  // A prize with an empty label is a blank slot (no reward).
+  var prizes = (store.prizes || []).map(function (p) {
+    var label = (p.label || "").trim(), blank = !label;
+    return {
+      label: label,
+      blank: blank,
+      weight: p.weight == null ? 1 : +p.weight,
+      short: (p.short || "").trim() || (blank ? (store.blankShort || "NEXT TIME") : label)
+    };
+  });
+
+  // ---------- page header ----------
+  document.title = store.name + " | Crazy Deal";
   document.documentElement.style.setProperty("--accent", ACCENT);
   $("storeName").textContent = store.name;
   $("branch").textContent = store.branch;
-  $("tagline").textContent = store.tagline;
-
-  function setLink(id, href) {
-    var el = $(id);
-    if (href) el.href = href; else el.classList.add("hidden");
-  }
-  setLink("reviewBtn", store.aiReviewUrl || store.googleReviewUrl);
-  setLink("waBtn", store.whatsapp
-    ? "https://wa.me/" + store.whatsapp + "?text=" + encodeURIComponent(store.whatsappMsg || "Hi!")
-    : "");
-  setLink("igBtn", store.instagram);
+  $("tagline").textContent = store.tagline ||
+    (GAME === "scratch" ? "Scratch the card. Unlock a crazy deal." : "Spin the wheel. Unlock a crazy deal.");
+  if (preview) $("previewBar").classList.remove("hidden");
 
   // ---------- storage (guarded: private mode must not break the page) ----------
-  var STORE_KEY = "taprizz:" + store.code;
-  function load() {
-    try { return JSON.parse(localStorage.getItem(STORE_KEY) || "null"); } catch (e) { return null; }
+  var REC_KEY = "taprizz:" + store.code, LEAD_KEY = "taprizz:lead";
+  function read(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } }
+  function write(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ } }
+  function clear(k) { try { localStorage.removeItem(k); } catch (e) { /* ignore */ } }
+
+  var lead = preview ? null : read(LEAD_KEY);
+
+  // ---------- links ----------
+  function setLink(id, href) {
+    var el = $(id);
+    if (href) { el.href = href; el.classList.remove("hidden"); } else { el.classList.add("hidden"); }
   }
-  function save(v) {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(v)); } catch (e) { /* ignore */ }
+  function waLink(rec) {
+    if (!store.whatsapp) return "";
+    var msg = store.whatsappMsg || "Hi!";
+    if (rec && !prizes[rec.idx].blank) {
+      msg = "Hi " + store.name + "! " + (lead && lead.name ? "I’m " + lead.name + ". " : "") +
+        "I won “" + prizes[rec.idx].label + "” (code " + rec.code + ").";
+    }
+    return "https://wa.me/" + store.whatsapp + "?text=" + encodeURIComponent(msg);
+  }
+  setLink("reviewBtn", store.aiReviewUrl || store.googleReviewUrl);
+  setLink("igBtn", store.instagram);
+  setLink("waBtn", waLink(null));
+
+  // ---------- play record (decided + saved BEFORE anything is shown, so refreshing cannot re-roll) ----------
+  function cooldownMs() {
+    return (store.playCooldownHours == null ? 24 : store.playCooldownHours) * 3600 * 1000;
   }
 
-  // ---------- wheel ----------
-  var prizes = store.prizes;
-  var n = prizes.length;
-  var seg = (2 * Math.PI) / n;
-  var canvas = $("wheel");
-  var ctx = canvas.getContext("2d");
-
-  function segStyle(i) {
-    if (n % 2 === 1 && i === n - 1) return { bg: IVORY, fg: "#15151b" };
-    return i % 2 === 0 ? { bg: INK, fg: IVORY } : { bg: ACCENT, fg: "#ffffff" };
+  function loadRecord() {
+    if (preview) return null;
+    var r = read(REC_KEY);
+    if (!r || typeof r.idx !== "number" || !prizes[r.idx]) return null;
+    if (prizes[r.idx].blank) {
+      if (Date.now() > r.issued + cooldownMs()) { clear(REC_KEY); return null; }
+      return r;
+    }
+    if (!Coupon.verify(window.STORES, r.code).ok) { clear(REC_KEY); return null; } // expired
+    return r;
   }
 
-  function drawWheel() {
-    var size = canvas.width, c = size / 2;
-    var ringW = size * 0.045;
-    var R = c - ringW;
-    ctx.clearRect(0, 0, size, size);
-
-    // segments
-    for (var i = 0; i < n; i++) {
-      var a0 = -Math.PI / 2 + i * seg, s = segStyle(i);
-      ctx.beginPath();
-      ctx.moveTo(c, c);
-      ctx.arc(c, c, R, a0, a0 + seg);
-      ctx.closePath();
-      ctx.fillStyle = s.bg;
-      ctx.fill();
-
-      ctx.save();
-      ctx.translate(c, c);
-      ctx.rotate(a0 + seg / 2);
-      ctx.textAlign = "right";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = s.fg;
-      var text = (prizes[i].short || prizes[i].label).toUpperCase();
-      ctx.font = "600 " + Math.round(size * (text.length > 9 ? 0.05 : 0.06)) + "px " + FONT;
-      if ("letterSpacing" in ctx) ctx.letterSpacing = "1px";
-      ctx.fillText(text, R - size * 0.06, 0, R * 0.6);
-      ctx.restore();
-    }
-
-    // depth: darker toward the center, same hue family
-    var g = ctx.createRadialGradient(c, c, R * 0.1, c, c, R);
-    g.addColorStop(0, "rgba(0,0,0,0.45)");
-    g.addColorStop(0.55, "rgba(0,0,0,0.05)");
-    g.addColorStop(1, "rgba(255,255,255,0.06)");
-    ctx.beginPath();
-    ctx.arc(c, c, R, 0, 2 * Math.PI);
-    ctx.fillStyle = g;
-    ctx.fill();
-
-    // segment dividers
-    ctx.strokeStyle = "rgba(255,255,255,0.14)";
-    ctx.lineWidth = 2;
-    for (var d = 0; d < n; d++) {
-      var ang = -Math.PI / 2 + d * seg;
-      ctx.beginPath();
-      ctx.moveTo(c + Math.cos(ang) * size * 0.07, c + Math.sin(ang) * size * 0.07);
-      ctx.lineTo(c + Math.cos(ang) * R, c + Math.sin(ang) * R);
-      ctx.stroke();
-    }
-
-    // outer ring
-    ctx.beginPath();
-    ctx.arc(c, c, c - ringW / 2, 0, 2 * Math.PI);
-    ctx.lineWidth = ringW;
-    ctx.strokeStyle = IVORY;
-    ctx.stroke();
-
-    // ring studs
-    var studs = Math.max(n * 4, 24);
-    for (var k = 0; k < studs; k++) {
-      var t = (k / studs) * 2 * Math.PI;
-      ctx.beginPath();
-      ctx.arc(c + Math.cos(t) * (c - ringW / 2), c + Math.sin(t) * (c - ringW / 2), ringW * 0.17, 0, 2 * Math.PI);
-      ctx.fillStyle = k % 2 === 0 ? ACCENT : "#15151b";
-      ctx.fill();
-    }
-
-    // inner lip
-    ctx.beginPath();
-    ctx.arc(c, c, R, 0, 2 * Math.PI);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = "rgba(0,0,0,0.35)";
-    ctx.stroke();
+  function validUntil(rec) {
+    return Coupon.fmt(Coupon.addDays(new Date(rec.issued), store.validDays || 30));
   }
-  drawWheel();
 
-  function pickPrize() {
-    var total = 0, i;
-    for (i = 0; i < n; i++) total += prizes[i].weight || 1;
-    var roll = Math.random() * total;
-    for (i = 0; i < n; i++) {
-      roll -= prizes[i].weight || 1;
-      if (roll < 0) return i;
-    }
-    return n - 1;
+  function sendLog(rec) {
+    if (preview || !store.sheetWebhook) return;
+    var p = prizes[rec.idx];
+    var body = JSON.stringify({
+      time: new Date(rec.issued).toISOString(),
+      store: store.name,
+      branch: store.branch,
+      game: GAME,
+      name: (lead && lead.name) || "",
+      phone: (lead && lead.phone) || "",
+      result: p.blank ? "No reward" : p.label,
+      code: rec.code || "",
+      validUntil: p.blank ? "" : validUntil(rec)
+    });
+    try {
+      fetch(store.sheetWebhook, {
+        method: "POST", mode: "no-cors", keepalive: true,
+        headers: { "Content-Type": "text/plain;charset=utf-8" }, body: body
+      });
+    } catch (e) { /* the customer experience must never depend on this */ }
+  }
+
+  function decide() {
+    var idx = Rand.weighted(prizes.map(function (p) { return p.weight; }));
+    var now = new Date();
+    var rec = {
+      idx: idx,
+      issued: now.getTime(),
+      code: prizes[idx].blank ? "" : Coupon.make(store, idx, now)
+    };
+    if (!preview) write(REC_KEY, rec);
+    sendLog(rec);
+    return rec;
   }
 
   // ---------- result ----------
-
-  function showCoupon(rec, returning) {
-    var prize = prizes[rec.prize];
-    var exp = Coupon.addDays(new Date(rec.issued), store.validDays || 30);
-    $("ticketEyebrow").textContent = returning ? "Welcome back · your reward" : "Congratulations · you won";
-    $("prizeLabel").textContent = prize.label;
-    $("prizeNote").textContent = store.minPurchaseNote || "Redeem it on your next visit";
-    $("couponCode").textContent = rec.code;
-    $("validAt").textContent = store.branch;
-    $("expires").textContent = Coupon.fmt(exp);
-
+  function showResult(rec, returning) {
+    var p = prizes[rec.idx];
+    $("gateCard").classList.add("hidden");
     $("gameCard").classList.add("hidden");
-    var ticket = $("couponCard"), actions = $("actions");
-    ticket.classList.remove("hidden");
-    actions.classList.remove("hidden");
-    ticket.classList.add("rise");
-    actions.classList.add("rise", "d1");
+
+    if (p.blank) {
+      $("ticketEyebrow").textContent = returning ? "Welcome back" : "Not this time";
+      $("prizeLabel").textContent = BLANK_MESSAGE;
+      $("prizeNote").textContent = "Thanks for playing. Come back soon for another chance.";
+      $("ticketBottomWrap").classList.add("hidden");
+    } else {
+      $("ticketEyebrow").textContent = returning ? "Welcome back · your reward" : "Congratulations · you won";
+      $("prizeLabel").textContent = p.label;
+      $("prizeNote").textContent = store.minPurchaseNote || "Redeem it on your next visit";
+      $("couponCode").textContent = rec.code;
+      $("validAt").textContent = store.branch;
+      $("expires").textContent = validUntil(rec);
+      $("ticketBottomWrap").classList.remove("hidden");
+    }
+
+    setLink("waBtn", waLink(rec));
+    var card = $("resultCard"), nav = $("actions");
+    card.classList.remove("hidden"); nav.classList.remove("hidden");
+    card.classList.add("rise"); nav.classList.add("rise", "d1");
+    if (!returning && !p.blank) confetti();
   }
 
   $("copyBtn").addEventListener("click", function () {
     var btn = this, code = $("couponCode").textContent;
-    function done() {
-      btn.textContent = "Copied";
-      setTimeout(function () { btn.textContent = "Copy"; }, 1600);
-    }
+    function done() { btn.textContent = "Copied"; setTimeout(function () { btn.textContent = "Copy"; }, 1600); }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(code).then(done, done);
     } else {
@@ -179,22 +169,18 @@
     }
   });
 
-  // ---------- one-shot celebration ----------
+  // One-shot celebration (wins only). Skipped for reduced motion.
   function confetti() {
     if (reduceMotion) return;
-    var cv = $("confetti"), cx = cv.getContext("2d");
-    var dpr = window.devicePixelRatio || 1;
-    cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
-    cx.scale(dpr, dpr);
-    var colors = [ACCENT, IVORY, "#ffffff", "#9b9ba8"];
-    var parts = [];
-    for (var i = 0; i < 70; i++) {
+    var cv = $("confetti"), cx = cv.getContext("2d"), dpr = window.devicePixelRatio || 1;
+    cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; cx.scale(dpr, dpr);
+    var colors = [ACCENT, IVORY, "#ffffff", "#9b9ba8"], parts = [], i;
+    for (i = 0; i < 70; i++) {
       parts.push({
         x: innerWidth / 2, y: innerHeight * 0.38,
-        vx: (Math.random() - 0.5) * 11, vy: -Math.random() * 11 - 3,
-        w: 5 + Math.random() * 5, h: 3 + Math.random() * 4,
-        r: Math.random() * 6, vr: (Math.random() - 0.5) * 0.3,
-        c: colors[i % colors.length]
+        vx: (Rand.float() - 0.5) * 11, vy: -Rand.float() * 11 - 3,
+        w: 5 + Rand.float() * 5, h: 3 + Rand.float() * 4,
+        r: Rand.float() * 6, vr: (Rand.float() - 0.5) * 0.3, c: colors[i % colors.length]
       });
     }
     var start = performance.now();
@@ -203,50 +189,52 @@
       cx.clearRect(0, 0, innerWidth, innerHeight);
       parts.forEach(function (p) {
         p.vy += 0.32; p.x += p.vx; p.y += p.vy; p.r += p.vr;
-        cx.save();
-        cx.globalAlpha = Math.max(0, 1 - t / 1600);
-        cx.translate(p.x, p.y); cx.rotate(p.r);
-        cx.fillStyle = p.c; cx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        cx.save(); cx.globalAlpha = Math.max(0, 1 - t / 1600);
+        cx.translate(p.x, p.y); cx.rotate(p.r); cx.fillStyle = p.c; cx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
         cx.restore();
       });
       if (t < 1600) requestAnimationFrame(frame); else cx.clearRect(0, 0, innerWidth, innerHeight);
     })(start);
   }
 
-  // Returning visitor with a still-valid coupon sees it again (no second spin).
-  var existing = load();
-  if (existing && existing.code && Coupon.verify(window.STORES, existing.code).ok) {
-    showCoupon(existing, true);
-    return;
+  // ---------- flow ----------
+  function startGame() {
+    $("gateCard").classList.add("hidden");
+    $("gameCard").classList.remove("hidden");
+    $("gameHint").textContent = Games[GAME].hint;
+    Games[GAME].mount($("gameHost"), {
+      store: store, prizes: prizes, accent: ACCENT, reduceMotion: reduceMotion,
+      blankMessage: BLANK_MESSAGE,
+      decide: decide,
+      complete: function (rec) { showResult(rec, false); }
+    });
   }
 
-  var spinning = false, turns = 0;
-  $("spinBtn").addEventListener("click", function () {
-    if (spinning) return;
-    spinning = true;
-    var btn = this;
-    btn.disabled = true;
-    btn.textContent = "Good luck…";
+  function showGate() {
+    var card = $("gateCard");
+    card.classList.remove("hidden");
+    $("consent").textContent = "By continuing, you agree that " + store.name + " may contact you about offers.";
+    var nameEl = $("leadName"), phoneEl = $("leadPhone"), errEl = $("leadError");
+    function fail(msg, el) { errEl.textContent = msg; errEl.classList.remove("hidden"); el.focus(); }
 
-    var idx = pickPrize();
-    var jitter = (Math.random() - 0.5) * seg * 0.7;
-    var target = -((idx + 0.5) * seg) + jitter;   // brings segment idx under the pointer
-    turns += 6;                                    // at least six full turns
-    var deg = (turns * 2 * Math.PI + target) * 180 / Math.PI;
-    canvas.style.transform = "rotate(" + deg + "deg)";
+    $("leadForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var name = nameEl.value.trim(), phone = phoneEl.value.replace(/[\s-]/g, "");
+      if (name.length < 2) return fail("Please enter your name.", nameEl);
+      if (!/^\+?\d{10,14}$/.test(phone)) return fail("Please enter a valid mobile number.", phoneEl);
+      errEl.classList.add("hidden");
+      lead = { name: name, phone: phone };
+      if (!preview) write(LEAD_KEY, lead);
+      startGame();
+    });
+  }
 
-    var done = false;
-    function finish() {
-      if (done) return;
-      done = true;
-      var now = new Date();
-      var rec = { code: Coupon.make(store, idx, now), prize: idx, issued: now.getTime() };
-      save(rec);
-      if (navigator.vibrate) { try { navigator.vibrate(40); } catch (e) { /* ignore */ } }
-      showCoupon(rec, false);
-      confetti();
-    }
-    canvas.addEventListener("transitionend", finish, { once: true });
-    setTimeout(finish, reduceMotion ? 300 : 5400);   // fallback if transitionend never fires
-  });
+  var existing = loadRecord();
+  if (existing) {
+    showResult(existing, true);
+  } else if (store.collectLead === true && !lead) {
+    showGate();
+  } else {
+    startGame();
+  }
 })();
