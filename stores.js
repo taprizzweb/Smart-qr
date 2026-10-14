@@ -1,5 +1,5 @@
 // All store data lives here. To add a store, use admin.html (fill the form, copy the block) or copy one below.
-// Store link: https://<your-site>/?s=<store-key>   (generate the QR from this link)
+// Store link: https://smartqr.taprizz.in/?s=<store-key>   (generate the QR from this link)
 
 // Secret used to sign coupons. Set it to something random before going live and never change it
 // afterwards (changing it invalidates every coupon already issued).

@@ -1,6 +1,6 @@
-# Taprizz Crazy Deal
+# Smart QR by Taprizz (smartqr.taprizz.in)
 
-Premium deal-game pages for stores: **spin wheel** (4 slots) or **scratch card**.
+Domain: **smartqr.taprizz.in** (not live until it is deployed and the DNS record is added). A separate product from the review stands (reviews.taprizz.in). Premium deal-game pages for stores: **spin wheel** (4 slots) or **scratch card**.
 Runs in two modes:
 
 | | Static mode | Server mode (recommended) |

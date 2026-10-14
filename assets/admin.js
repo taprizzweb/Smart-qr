@@ -91,7 +91,7 @@
     return out.filter(function (v, i, a) { return a.indexOf(v) === i; });
   }
 
-  function base() { return ($("base").value.trim() || location.origin + location.pathname.replace(/[^/]*$/, "")).replace(/\/+$/, ""); }
+  function base() { return ($("base").value.trim() || "https://smartqr.taprizz.in").replace(/\/+$/, ""); }
   function customerLink(key) { return base() + "/?s=" + encodeURIComponent(key || "your-store"); }
 
   function staticBlock(c) {
