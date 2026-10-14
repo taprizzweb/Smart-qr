@@ -257,6 +257,10 @@ begin
     where n.nspname = 'public' and p.proname like 'sq\_%'
   loop
     execute format('revoke all on function %s from public', f);
+    -- Supabase grants new functions to its API roles by default; take that back for everything, then grant only the public API below.
+    if exists (select 1 from pg_roles where rolname = 'anon') then
+      execute format('revoke all on function %s from anon, authenticated', f);
+    end if;
   end loop;
   if exists (select 1 from pg_roles where rolname = 'anon') then
     grant execute on function

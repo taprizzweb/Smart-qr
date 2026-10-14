@@ -1,3 +1,1 @@
-// Fill these two from your Supabase project (Project settings > API): the project URL and the publishable (anon) key.
-// The publishable key is safe to ship in a web page: it can only call the sq_* functions.
-window.SQ = { url: "", anonKey: "" };
+window.SQ = { url: "https://pjophsiodkctmyyfkpnm.supabase.co", anonKey: "sb_publishable_d55Z9QXsWQ7SStVMNpAIfw_kme_frrL" };
