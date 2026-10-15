@@ -115,6 +115,7 @@
     if (/sq_links_target_check/.test(m)) return "The link must start with https://";
     if (/website_check/.test(m)) return "The website link must start with https://";
     if (/bad_buttons/.test(m)) return "One of the extra buttons is not valid. Check its name and link.";
+    if (/contact_phone_check/.test(m)) return "Contact phone: digits only, with country code.";
     if (/menu_url_check/.test(m)) return "The menu link must start with https://";
     if (/facebook_check/.test(m)) return "The Facebook link must start with https://";
     if (/zomato_check/.test(m)) return "The Zomato link must start with https://";
@@ -294,7 +295,7 @@
     ]);
   }
 
-  var TAP_LABELS = [["review", "AI review"], ["map", "Location"], ["whatsapp", "WhatsApp"], ["instagram", "Instagram"], ["website", "Website"], ["menu", "Menu"], ["facebook", "Facebook"], ["zomato", "Zomato"], ["custom", "Extra buttons"], ["game", "Game opens"]];
+  var TAP_LABELS = [["review", "AI review"], ["map", "Location"], ["whatsapp", "WhatsApp"], ["instagram", "Instagram"], ["website", "Website"], ["contact", "Contact saves"], ["menu", "Menu"], ["facebook", "Facebook"], ["zomato", "Zomato"], ["custom", "Extra buttons"], ["game", "Game opens"]];
 
   function viewDash() {
     current = "dash";
@@ -611,7 +612,7 @@
   function viewEdit(slug) {
     current = "edit";
     var isNew = !slug;
-    var blank = { slug: "", name: "", address: "", color: "#2563eb", reviewUrl: "", mapUrl: "", whatsapp: "", instagram: "", website: "", zomato: "", menuUrl: "", facebook: "", buttons: [], gameOn: true, active: true, logo: null, logoThumb: null };
+    var blank = { slug: "", name: "", address: "", color: "#2563eb", reviewUrl: "", mapUrl: "", whatsapp: "", instagram: "", website: "", zomato: "", menuUrl: "", facebook: "", saveContact: false, contactPhone: "", buttons: [], gameOn: true, active: true, logo: null, logoThumb: null };
     screen([h("div", { class: "top" }, [h("a", { class: "back", href: "#/shops" }, [icon(ICONS.back, 20), "Shops"])]), h("div", { class: "skeleton" }), h("div", { class: "skeleton" })]);
     var linksP = rpc("sq_admin_links", { p_key: adminKey }).catch(function () { return []; });
     if (isNew) { linksP.then(function (l) { build(blank, l); }); return; }
@@ -624,7 +625,7 @@
       var st = JSON.parse(JSON.stringify(src));
       ["address", "reviewUrl", "mapUrl", "whatsapp", "instagram", "website", "zomato", "menuUrl", "facebook"].forEach(function (k) { if (st[k] == null) st[k] = ""; });
       st.buttons = (st.buttons || []).map(function (b) { return { kind: b.kind, label: b.label, value: b.kind === "call" ? waLabel(b.value) : b.value }; });
-      st.qrCode = "";
+      st.qrCode = ""; st.contactPhoneRaw = st.contactPhone ? waLabel(st.contactPhone) : "";
       st.color = String(st.color || "#2563eb").toLowerCase();
       st.whatsappRaw = st.whatsapp ? waLabel(st.whatsapp) : ""; st.instagramRaw = st.instagram; st.logoChanged = false;
       var orig = JSON.stringify(st), slugTouched = !isNew;
@@ -640,6 +641,7 @@
         var two = h("div", { class: "two" }, []);
         two.appendChild(h("i")); if (st.whatsappRaw) two.appendChild(h("i"));
         var more = [];
+        if (st.saveContact) more.push(h("i"));
         if (st.menuUrl.trim()) more.push(h("i"));
         if (st.facebook.trim()) more.push(h("i"));
         if (st.website.trim()) more.push(h("i"));
@@ -684,6 +686,8 @@
       var qrList = myLinks.length ? h("div", { class: "chips" }, myLinks.map(function (l) {
         return h("a", { class: "chip", href: "#/link/" + encodeURIComponent(l.code) }, [l.code, h("small", { text: l.clicks + (l.clicks === 1 ? " open" : " opens") })]);
       })) : null;
+      var cpIn = h("input", { id: "f-cphone", type: "tel", value: st.contactPhoneRaw, inputmode: "tel", autocomplete: "off", placeholder: "Empty uses the WhatsApp number" });
+      cpIn.addEventListener("input", function () { st.contactPhoneRaw = cpIn.value; touch(); });
       var menuIn = bind(h("input", { id: "f-menu", type: "url", value: st.menuUrl, inputmode: "url", autocomplete: "off", autocapitalize: "none", placeholder: "Link to your menu (website, PDF, Drive)" }), "menuUrl");
       var fbIn = bind(h("input", { id: "f-fb", type: "text", value: st.facebook, autocomplete: "off", autocapitalize: "none", spellcheck: "false", placeholder: "Page name or facebook.com link" }), "facebook");
       var zomato = bind(h("input", { id: "f-zomato", type: "url", value: st.zomato, inputmode: "url", autocomplete: "off", autocapitalize: "none", placeholder: "Paste the Zomato restaurant link" }), "zomato");
@@ -775,6 +779,8 @@
         var u2 = normUrl(st.mapUrl); if (!u2.ok) return err(map, "Enter a link that starts with https://");
         var w = normWa(st.whatsappRaw); if (!w.ok) return err(wa, "Enter a valid WhatsApp number.");
         var i = normIg(st.instagramRaw); if (!i.ok) return err(ig, "Enter an Instagram handle like @shopname, or a link.");
+        var cpn = normWa(st.contactPhoneRaw); if (!cpn.ok) return err(cpIn, "Enter a valid phone number.");
+        if (st.saveContact && !cpn.value && !w.value) return err(cpIn, "Add a phone number (here or as the WhatsApp number) for the contact.");
         var mu = normUrl(st.menuUrl); if (!mu.ok) return err(menuIn, "Enter the menu link, it starts with https://");
         var fbn = normFb(st.facebook); if (!fbn.ok) return err(fbIn, "Enter your Facebook page name or a facebook.com link.");
         var wb = normUrl(st.website); if (!wb.ok) return err(website, "Enter a website like www.yourshop.com");
@@ -792,7 +798,7 @@
         var qrNo = st.qrCode.trim();
         if (qrNo && !/^[a-z0-9-]{3,40}$/.test(qrNo)) return err(qrIn, "QR number: 3 to 40 letters, numbers or hyphens, like " + nextNo + ".");
         var body = { slug: isNew ? sg : st.slug, name: nm, address: st.address.trim(), color: st.color, reviewUrl: u1.value, mapUrl: u2.value,
-          whatsapp: w.value, instagram: i.value, website: wb.value, zomato: zm.value, menuUrl: mu.value, facebook: fbn.value, buttons: btns, gameOn: !!st.gameOn, active: !!st.active };
+          whatsapp: w.value, instagram: i.value, website: wb.value, zomato: zm.value, menuUrl: mu.value, facebook: fbn.value, saveContact: !!st.saveContact, contactPhone: cpn.value, buttons: btns, gameOn: !!st.gameOn, active: !!st.active };
         if (st.logoChanged) { body.logo = st.logo; body.logoThumb = st.logoThumb; }
         if (qrNo) body.qrCode = qrNo;
         saveBtn.disabled = true; saveBtn.textContent = "Saving...";
@@ -829,6 +835,8 @@
           field("AI review link", "f-review", review, "Leave empty to hide the AI Review button."),
           field("Location link", "f-map", map, "Empty uses a Google Maps search for the shop name and address."),
           field("WhatsApp number", "f-wa", wa, waHint),
+          toggle("saveContact", "Save to contacts button", "Customers tap once to save your name and number in their phone."),
+          field("Contact phone", "f-cphone", cpIn, "Used for the Save to contacts button. Empty uses the WhatsApp number."),
           field("Menu", "f-menu", menuIn, "Optional. Shows a View our menu button with a food icon. Empty hides it."),
           field("Instagram", "f-ig", ig, "Empty hides the Instagram button."),
           field("Facebook", "f-fb", fbIn, "Optional. Page name or link. Empty hides the Facebook button."),
@@ -853,6 +861,7 @@
             var c = r.counts || {}, max = Math.max.apply(null, r.daily.map(function (d) { return d.views; }).concat([1]));
             statsBox.innerHTML = "";
             var rows = [["view", "Page views"], ["review", "AI review taps"], ["map", "Location taps"], ["whatsapp", "WhatsApp taps"], ["instagram", "Instagram taps"]];
+            if (src.saveContact) rows.push(["contact", "Contact saves"]);
             if (src.menuUrl) rows.push(["menu", "Menu taps"]);
             if (src.facebook) rows.push(["facebook", "Facebook taps"]);
             if (src.website) rows.push(["website", "Website taps"]);
