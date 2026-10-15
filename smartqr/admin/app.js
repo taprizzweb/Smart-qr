@@ -92,6 +92,7 @@
     if (/map_url_check/.test(m)) return "The location link must start with https://";
     if (/website_check/.test(m)) return "The website link must start with https://";
     if (/bad_buttons/.test(m)) return "One of the extra buttons is not valid. Check its name and link.";
+    if (/zomato_check/.test(m)) return "The Zomato link must start with https://";
     if (/instagram_check/.test(m)) return "Instagram must be a handle or an https:// link.";
     if (/whatsapp_check/.test(m)) return "WhatsApp number: digits only, with country code.";
     if (/color_check/.test(m)) return "Please pick a valid colour.";
@@ -260,7 +261,7 @@
     ]);
   }
 
-  var TAP_LABELS = [["review", "AI review"], ["map", "Location"], ["whatsapp", "WhatsApp"], ["instagram", "Instagram"], ["website", "Website"], ["custom", "Extra buttons"], ["game", "Game opens"]];
+  var TAP_LABELS = [["review", "AI review"], ["map", "Location"], ["whatsapp", "WhatsApp"], ["instagram", "Instagram"], ["website", "Website"], ["zomato", "Zomato"], ["custom", "Extra buttons"], ["game", "Game opens"]];
 
   function viewDash() {
     current = "dash";
@@ -405,7 +406,7 @@
   function viewEdit(slug) {
     current = "edit";
     var isNew = !slug;
-    var blank = { slug: "", name: "", address: "", color: "#2563eb", reviewUrl: "", mapUrl: "", whatsapp: "", instagram: "", website: "", buttons: [], gameOn: true, active: true, logo: null, logoThumb: null };
+    var blank = { slug: "", name: "", address: "", color: "#2563eb", reviewUrl: "", mapUrl: "", whatsapp: "", instagram: "", website: "", zomato: "", buttons: [], gameOn: true, active: true, logo: null, logoThumb: null };
     screen([h("div", { class: "top" }, [h("a", { class: "back", href: "#/shops" }, [icon(ICONS.back, 20), "Shops"])]), h("div", { class: "skeleton" }), h("div", { class: "skeleton" })]);
     if (isNew) { build(blank); return; }
     guarded(rpc("sq_admin_get", { p_key: adminKey, p_slug: slug }), function (e) {
@@ -415,7 +416,7 @@
 
     function build(src) {
       var st = JSON.parse(JSON.stringify(src));
-      ["address", "reviewUrl", "mapUrl", "whatsapp", "instagram", "website"].forEach(function (k) { if (st[k] == null) st[k] = ""; });
+      ["address", "reviewUrl", "mapUrl", "whatsapp", "instagram", "website", "zomato"].forEach(function (k) { if (st[k] == null) st[k] = ""; });
       st.buttons = (st.buttons || []).map(function (b) { return { kind: b.kind, label: b.label, value: b.kind === "call" ? waLabel(b.value) : b.value }; });
       st.color = String(st.color || "#2563eb").toLowerCase();
       st.whatsappRaw = st.whatsapp ? waLabel(st.whatsapp) : ""; st.instagramRaw = st.instagram; st.logoChanged = false;
@@ -433,6 +434,7 @@
         two.appendChild(h("i")); if (st.whatsappRaw) two.appendChild(h("i"));
         var more = [];
         if (st.website.trim()) more.push(h("i"));
+        if (st.zomato.trim()) more.push(h("i", { style: "background:#e23744" }));
         st.buttons.forEach(function () { more.push(h("i")); });
         pv.appendChild(h("div", { class: "bx" }, [st.reviewUrl ? h("i", { style: "height:46px" }) : null, two, st.instagramRaw ? h("i") : null].concat(more, [st.gameOn ? h("i", { class: "dark" }) : null])));
         var lg = h("div", { class: "lg" });
@@ -464,6 +466,8 @@
         touch();
       });
       var website = bind(h("input", { id: "f-web", type: "url", value: st.website, inputmode: "url", autocomplete: "off", autocapitalize: "none", placeholder: "www.yourshop.com" }), "website");
+
+      var zomato = bind(h("input", { id: "f-zomato", type: "url", value: st.zomato, inputmode: "url", autocomplete: "off", autocapitalize: "none", placeholder: "Paste the Zomato restaurant link" }), "zomato");
 
       // extra buttons (owner's own: menu, booking, offer, call, email...)
       var MAXB = 6, btnList = h("div"), addBtn = h("button", { class: "btn small", type: "button", onclick: function () {
@@ -553,6 +557,8 @@
         var w = normWa(st.whatsappRaw); if (!w.ok) return err(wa, "Enter a valid WhatsApp number.");
         var i = normIg(st.instagramRaw); if (!i.ok) return err(ig, "Enter an Instagram handle like @shopname, or a link.");
         var wb = normUrl(st.website); if (!wb.ok) return err(website, "Enter a website like www.yourshop.com");
+        var zm = normUrl(st.zomato); if (!zm.ok) return err(zomato, "Enter the Zomato link, it starts with https://");
+        if (zm.value && !/^https:\/\/([a-z0-9-]+\.)*(zomato\.com|zoma\.to)(\/|$|\?)/i.test(zm.value)) return err(zomato, "This does not look like a Zomato link (zomato.com or zoma.to).");
         var btns = [], bi;
         for (bi = 0; bi < st.buttons.length; bi++) {
           var b = st.buttons[bi], rowIn = btnList.querySelectorAll(".btrow")[bi].querySelectorAll("input"), bl = String(b.label || "").trim(), bv = String(b.value || "").trim(), nv;
@@ -563,7 +569,7 @@
           btns.push({ kind: b.kind, label: bl, value: bv });
         }
         var body = { slug: isNew ? sg : st.slug, name: nm, address: st.address.trim(), color: st.color, reviewUrl: u1.value, mapUrl: u2.value,
-          whatsapp: w.value, instagram: i.value, website: wb.value, buttons: btns, gameOn: !!st.gameOn, active: !!st.active };
+          whatsapp: w.value, instagram: i.value, website: wb.value, zomato: zm.value, buttons: btns, gameOn: !!st.gameOn, active: !!st.active };
         if (st.logoChanged) { body.logo = st.logo; body.logoThumb = st.logoThumb; }
         saveBtn.disabled = true; saveBtn.textContent = "Saving...";
         guarded(rpc("sq_admin_save", { p_key: adminKey, p_shop: body }), function (e) { toast(errText(e), true); }).then(function (r) {
@@ -592,6 +598,7 @@
           field("WhatsApp number", "f-wa", wa, waHint),
           field("Instagram", "f-ig", ig, "Empty hides the Instagram button."),
           field("Website", "f-web", website, "Optional. Empty hides the website button."),
+          field("Zomato", "f-zomato", zomato, "Optional. Shows a red Zomato button. Empty hides it."),
           toggle("gameOn", "Quick game button", "A fun spin wheel. Nothing is saved.")]),
         h("div", { class: "card" }, [h("h2", { text: "More buttons" }),
           h("p", { class: "muted", style: "margin:-4px 0 14px", text: "Add your own buttons, up to 6: menu, booking, offers, call, email." }),
@@ -612,6 +619,7 @@
             statsBox.innerHTML = "";
             var rows = [["view", "Page views"], ["review", "AI review taps"], ["map", "Location taps"], ["whatsapp", "WhatsApp taps"], ["instagram", "Instagram taps"]];
             if (src.website) rows.push(["website", "Website taps"]);
+            if (src.zomato) rows.push(["zomato", "Zomato taps"]);
             (src.buttons || []).forEach(function (b, i) { rows.push(["b" + i, b.label + " taps"]); });
             rows.push(["game", "Game opens"]);
             statsBox.appendChild(h("div", { class: "kv" }, rows
