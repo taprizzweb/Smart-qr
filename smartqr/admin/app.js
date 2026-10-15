@@ -5,7 +5,7 @@
   var app = document.getElementById("app");
   var KEY = "sq:adminKey", NUDGE = "sq:installNudge";
   var COLORS = ["#2563eb", "#0e9f8e", "#16a34a", "#f59e0b", "#e11d48", "#7c3aed", "#ea580c", "#0f172a"];
-  var RESERVED = ["admin", "assets", "vendor", "icons", "api", "config", "p", "sw"];
+  var RESERVED = ["admin", "assets", "vendor", "icons", "api", "config", "p", "sw", "sq"];
   var adminKey = null, deferredInstall = null, current = "";
 
   try { adminKey = localStorage.getItem(KEY) || null; } catch (e) { /* storage blocked */ }
@@ -38,7 +38,8 @@
     shops: "M4 9l1.2-4.5h13.6L20 9M4 9v10h16V9M4 9h16M9 19v-5h6v5",
     gear: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z",
     back: "M15 18l-6-6 6-6",
-    plus: "M12 5v14M5 12h14"
+    plus: "M12 5v14M5 12h14",
+    qr: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z"
   };
 
   function lum(hex) {
@@ -50,6 +51,15 @@
   function slugify(s) { return String(s || "").toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/[\s_]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 40); }
   function base() { return String(cfg.base || location.origin).replace(/\/+$/, ""); }
   function pageUrl(slug) { return base() + "/" + slug; }
+  function linkUrl(code) { return base() + "/sq/" + code; }
+  // A QR printed with a temporary *.vercel.app address would stop working once the real domain is used.
+  function tempAddress() { return !cfg.base && /\.vercel\.app$/i.test(location.hostname); }
+  function randomCode() {
+    var chars = "abcdefghjkmnpqrstuvwxyz23456789", out = "", a = new Uint32Array(6), i;
+    (window.crypto || window.msCrypto).getRandomValues(a);
+    for (i = 0; i < 6; i++) out += chars.charAt(a[i] % chars.length);
+    return out;
+  }
 
   var toastTimer = null;
   function toast(msg, bad) {
@@ -90,6 +100,11 @@
     if (/slug_check/.test(m)) return "Page link: use 2 to 40 lowercase letters, numbers or hyphens. Words like admin are reserved.";
     if (/review_url_check/.test(m)) return "The AI review link must start with https://";
     if (/map_url_check/.test(m)) return "The location link must start with https://";
+    if (m === "code_taken") return "This QR code name is already used. Choose another one.";
+    if (m === "code_check") return "QR code name: 3 to 40 lowercase letters, numbers or hyphens.";
+    if (m === "destination_required") return "Choose where this QR should open.";
+    if (m === "link_not_found") return "This QR link no longer exists.";
+    if (/sq_links_target_check/.test(m)) return "The link must start with https://";
     if (/website_check/.test(m)) return "The website link must start with https://";
     if (/bad_buttons/.test(m)) return "One of the extra buttons is not valid. Check its name and link.";
     if (/zomato_check/.test(m)) return "The Zomato link must start with https://";
@@ -181,6 +196,7 @@
     return h("nav", { class: "nav", "aria-label": "Main" }, [h("div", {}, [
       h("a", { href: "#/", "aria-current": active === "dash" ? "page" : null }, [icon(ICONS.dash), "Dashboard"]),
       h("a", { href: "#/shops", "aria-current": active === "shops" ? "page" : null }, [icon(ICONS.shops), "Shops"]),
+      h("a", { href: "#/links", "aria-current": active === "links" ? "page" : null }, [icon(ICONS.qr), "QR links"]),
       h("a", { href: "#/settings", "aria-current": active === "settings" ? "page" : null }, [icon(ICONS.gear), "Settings"])
     ])]);
   }
@@ -374,6 +390,159 @@
       if (rows === FAIL) return;
       all = rows; count.textContent = rows.length + (rows.length === 1 ? " shop" : " shops"); paint();
     });
+  }
+
+  // ---------- QR links: <domain>/sq/<code> -> any destination you choose, changeable any time ----------
+  function destText(l) { return l.shopSlug ? "Shop: " + (l.shopName || l.shopSlug) : String(l.target || "").replace(/^https?:\/\//, ""); }
+
+  function viewLinks() {
+    current = "links";
+    var holder = h("div", {}, [h("div", { class: "skeleton" }), h("div", { class: "skeleton" })]);
+    var search = h("input", { type: "search", placeholder: "Search QR links", "aria-label": "Search QR links" });
+    var count = h("p", { class: "sub", text: "Loading..." });
+    screen([
+      h("div", { class: "top" }, [
+        h("div", {}, [h("h1", { text: "QR links" }), count]),
+        h("a", { class: "btn primary small", href: "#/link/new" }, [icon(ICONS.plus, 18), "New QR"])
+      ]),
+      h("div", { class: "field search" }, [search]),
+      holder,
+      nav("links")
+    ]);
+    var all = [];
+    function paint() {
+      var q = search.value.trim().toLowerCase();
+      var list = all.filter(function (l) { return !q || (l.code + " " + (l.label || "") + " " + destText(l)).toLowerCase().indexOf(q) > -1; });
+      holder.innerHTML = "";
+      if (!all.length) {
+        holder.appendChild(h("div", { class: "empty" }, [
+          h("h2", { text: "No QR links yet" }),
+          h("p", { text: "Make a permanent QR. Print it once, then change where it opens whenever you like." }),
+          h("a", { class: "btn primary", href: "#/link/new", style: "margin-top:12px" }, [icon(ICONS.plus, 18), "New QR"])
+        ]));
+        return;
+      }
+      if (!list.length) { holder.appendChild(h("div", { class: "empty" }, [h("p", { text: "No QR link matches \"" + search.value.trim() + "\"." })])); return; }
+      list.forEach(function (l) {
+        var t = h("div", { class: "thumb" }, [icon(ICONS.qr, 24)]); t.style.setProperty("--c", "#10131a"); t.style.setProperty("--on", "#ffffff");
+        holder.appendChild(h("a", { class: "shop", href: "#/link/" + encodeURIComponent(l.code) }, [
+          t,
+          h("div", { class: "meta" }, [h("b", { text: l.label || "/sq/" + l.code }), h("span", { text: "/sq/" + l.code + " → " + destText(l) })]),
+          h("div", { class: "end" }, [h("b", { class: l.active ? "" : "off", text: l.active ? "Live" : "Paused" }), h("span", { text: l.clicks + (l.clicks === 1 ? " open" : " opens") })])
+        ]));
+      });
+    }
+    search.addEventListener("input", paint);
+    guarded(rpc("sq_admin_links", { p_key: adminKey }), function (e) {
+      holder.innerHTML = ""; count.textContent = "Could not load";
+      holder.appendChild(h("div", { class: "empty" }, [h("p", { text: errText(e) }), h("button", { class: "btn", type: "button", text: "Try again", onclick: viewLinks })]));
+    }).then(function (rows) {
+      if (rows === FAIL) return;
+      all = rows; count.textContent = rows.length + (rows.length === 1 ? " QR link" : " QR links"); paint();
+    });
+  }
+
+  function viewLinkEdit(code) {
+    current = "linkedit";
+    var isNew = !code;
+    var top = h("div", { class: "top" }, [h("a", { class: "back", href: "#/links" }, [icon(ICONS.back, 20), "QR links"])]);
+    screen([top, h("div", { class: "skeleton" }), h("div", { class: "skeleton" })]);
+    var shopsP = guarded(rpc("sq_admin_list", { p_key: adminKey }), function (e) { toast(errText(e), true); });
+    var linkP = isNew ? Promise.resolve({ code: "", label: "", target: "", shopSlug: null, active: true, clicks: 0 }) : guarded(rpc("sq_admin_link_get", { p_key: adminKey, p_code: code }), function (e) {
+      screen([top, h("div", { class: "empty" }, [h("p", { text: errText(e) })]), nav("links")]);
+    });
+    Promise.all([linkP, shopsP]).then(function (r) { if (r[0] !== FAIL && r[1] !== FAIL) build(r[0], r[1]); });
+
+    function build(src, shops) {
+      var st = { code: src.code, label: src.label || "", mode: src.shopSlug || (isNew && shops.length) ? "shop" : "url", shopSlug: src.shopSlug || (shops[0] && shops[0].slug) || "", target: src.target || "", active: src.active !== false };
+      if (!isNew && !src.shopSlug) st.mode = "url";
+      var orig = JSON.stringify(st);
+      var dirty = h("p", { class: "dirty", text: "Unsaved changes", hidden: true });
+      function touch() { dirty.hidden = JSON.stringify(st) === orig; }
+      function err(el, msg) {
+        var f = el.closest(".field"), old = f.querySelector(".err"); if (old) old.remove();
+        f.appendChild(h("span", { class: "err", role: "alert", text: msg })); el.focus();
+      }
+
+      var codeIn = h("input", { id: "l-code", type: "text", value: st.code, maxlength: "40", autocomplete: "off", autocapitalize: "none", spellcheck: "false", readonly: !isNew, placeholder: "table-5" });
+      codeIn.addEventListener("input", function () { st.code = codeIn.value.toLowerCase().replace(/[^a-z0-9-]/g, ""); if (codeIn.value !== st.code) codeIn.value = st.code; touch(); });
+      var label = h("input", { id: "l-label", type: "text", value: st.label, maxlength: "80", autocomplete: "off", placeholder: "Table 5 standee" });
+      label.addEventListener("input", function () { st.label = label.value; touch(); });
+      var target = h("input", { id: "l-target", type: "url", value: st.target, inputmode: "url", autocomplete: "off", autocapitalize: "none", placeholder: "https://..." });
+      target.addEventListener("input", function () { st.target = target.value; touch(); });
+      var pick = h("select", { id: "l-shop", "aria-label": "Shop page" }, shops.map(function (s) { return h("option", { value: s.slug, text: s.name }); }));
+      pick.value = st.shopSlug; pick.addEventListener("change", function () { st.shopSlug = pick.value; touch(); });
+      var mode = h("select", { id: "l-mode", "aria-label": "Opens" }, [h("option", { value: "shop", text: "One of my shop pages" }), h("option", { value: "url", text: "Any link" })]);
+      mode.value = st.mode;
+      var shopField = h("div", { class: "field" }, [h("label", { for: "l-shop", text: "Shop page" }), pick, shops.length ? null : h("span", { class: "hint", text: "No shops yet. Use Any link, or add a shop first." })]);
+      var urlField = h("div", { class: "field" }, [h("label", { for: "l-target", text: "Link" }), target, h("span", { class: "hint", text: "Must start with https://. You can change it any time and the printed QR keeps working." })]);
+      function paintMode() { shopField.hidden = st.mode !== "shop"; urlField.hidden = st.mode !== "url"; }
+      mode.addEventListener("change", function () { st.mode = mode.value; paintMode(); touch(); });
+      paintMode();
+
+      var gen = isNew ? h("button", { class: "btn small", type: "button", text: "Make a code for me", onclick: function () { st.code = randomCode(); codeIn.value = st.code; touch(); } }) : null;
+      var cb = h("input", { type: "checkbox", role: "switch", "aria-label": "QR is active" }); cb.checked = st.active;
+      cb.addEventListener("change", function () { st.active = cb.checked; touch(); });
+
+      var saveBtn = h("button", { class: "btn primary", type: "button", text: isNew ? "Create QR link" : "Save changes" });
+      saveBtn.addEventListener("click", function () {
+        Array.prototype.forEach.call(app.querySelectorAll(".field .err"), function (n) { n.remove(); });
+        var body = { code: isNew ? st.code.trim() : src.code, label: st.label.trim(), active: !!st.active };
+        if (isNew && !/^[a-z0-9-]{3,40}$/.test(body.code)) return err(codeIn, "Use 3 to 40 lowercase letters, numbers or hyphens.");
+        if (st.mode === "shop") { if (!st.shopSlug) return err(pick, "Choose a shop page."); body.shopSlug = st.shopSlug; }
+        else { var u = normUrl(st.target); if (!u.ok || !u.value) return err(target, "Enter a link that starts with https://"); body.target = u.value; }
+        if (isNew) body.create = true;
+        saveBtn.disabled = true; saveBtn.textContent = "Saving...";
+        guarded(rpc("sq_admin_link_save", { p_key: adminKey, p_link: body }), function (e) { toast(errText(e), true); }).then(function (r) {
+          saveBtn.disabled = false; saveBtn.textContent = isNew ? "Create QR link" : "Save changes";
+          if (r === FAIL) return;
+          toast(r.created ? "QR link created" : "Saved");
+          if (r.created) location.hash = "#/link/" + encodeURIComponent(r.code); else viewLinkEdit(src.code);
+        });
+      });
+
+      var kids = [
+        top,
+        h("div", { class: "top", style: "min-height:0;margin-bottom:8px" }, [h("h1", { text: isNew ? "New QR link" : (src.label || "/sq/" + src.code) })]),
+        h("div", { class: "card" }, [h("h2", { text: "QR code" }),
+          h("div", { class: "field" }, [h("label", { for: "l-code", text: "Code in the link" }),
+            h("div", { class: "prefix" }, [h("span", { text: base().replace(/^https?:\/\//, "") + "/sq/" }), codeIn]),
+            h("span", { class: "hint", text: isNew ? "Printed in the QR, so choose it once. It cannot be changed later." : "Fixed, because the QR code points here." }), gen]),
+          h("div", { class: "field" }, [h("label", { for: "l-label", text: "Note for yourself (optional)" }), label])]),
+        h("div", { class: "card" }, [h("h2", { text: "Opens" }),
+          h("div", { class: "field" }, [h("label", { for: "l-mode", text: "This QR opens" }), mode]),
+          shopField, urlField]),
+        h("div", { class: "card" }, [h("h2", { text: "Status" }),
+          h("div", { class: "setting" }, [h("div", {}, [h("b", { text: "QR is active" }), h("small", { text: "Turn off to pause it. People scanning see a short \"not active\" message." })]), h("label", { class: "switch" }, [cb, h("i")])])])
+      ];
+
+      if (!isNew) {
+        var delWrap = h("div");
+        kids.push(
+          h("div", { class: "card" }, [h("h2", { text: "Share" }),
+            tempAddress() ? h("p", { class: "warn", role: "alert", text: "This address is temporary. Set your own domain before printing." }) : null,
+            h("div", { class: "linkbox" }, [h("span", { text: linkUrl(src.code) })]),
+            h("div", { class: "actions3" }, [
+              h("button", { class: "btn small", type: "button", text: "Copy link", onclick: function () { copy(linkUrl(src.code), "Link copied"); } }),
+              h("a", { class: "btn small", href: linkUrl(src.code), target: "_blank", rel: "noopener", text: "Test it" }),
+              h("button", { class: "btn small", type: "button", text: "QR code", onclick: function () { openQrUrl({ title: src.label || "/sq/" + src.code, url: linkUrl(src.code), file: "sq-" + src.code }); } })
+            ])]),
+          h("div", { class: "card" }, [h("h2", { text: "Numbers" }),
+            h("div", { class: "kv" }, [
+              h("div", {}, [h("b", { text: String(src.clicks || 0) }), h("span", { text: "Times opened" })]),
+              h("div", {}, [h("b", { style: "font-size:16px", text: src.lastOpened ? new Date(src.lastOpened).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "Never" }), h("span", { text: "Last opened" })])
+            ])]),
+          h("div", { class: "card" }, [h("h2", { text: "Delete" }),
+            h("p", { class: "muted", style: "margin:0 0 12px", text: "Removes this QR link. A printed QR with this code will show \"not active\"." }),
+            h("button", { class: "btn danger", type: "button", text: "Delete this QR link...", onclick: function () {
+              confirmDelete(delWrap, { typed: src.code, button: "Delete QR link", keep: "Keep it", done: "QR link deleted", hash: "#/links",
+                call: function () { return rpc("sq_admin_link_delete", { p_key: adminKey, p_code: src.code }); } });
+            } }), delWrap])
+        );
+      }
+      kids.push(h("div", { class: "bar" }, [h("div", {}, [h("a", { class: "btn", href: "#/links", text: "Cancel" }), saveBtn, dirty])]));
+      screen(kids, { bar: true });
+    }
   }
 
   function viewSettings() {
@@ -653,53 +822,66 @@
     }
   }
 
-  function showDelete(wrap, shop) {
+  // Typed-name confirmation shared by shops and QR links. `call()` returns the server promise.
+  function confirmDelete(wrap, o) {
     wrap.innerHTML = "";
-    var input = h("input", { type: "text", "aria-label": "Type the shop name to confirm", autocomplete: "off", placeholder: shop.name });
-    var go = h("button", { class: "btn danger", type: "button", text: "Delete shop", disabled: true });
-    input.addEventListener("input", function () { go.disabled = input.value.trim().toLowerCase() !== shop.name.trim().toLowerCase(); });
+    var input = h("input", { type: "text", "aria-label": "Type " + o.typed + " to confirm", autocomplete: "off", placeholder: o.typed });
+    var go = h("button", { class: "btn danger", type: "button", text: o.button, disabled: true });
+    input.addEventListener("input", function () { go.disabled = input.value.trim().toLowerCase() !== o.typed.trim().toLowerCase(); });
     go.addEventListener("click", function () {
       go.disabled = true; go.textContent = "Deleting...";
-      guarded(rpc("sq_admin_delete", { p_key: adminKey, p_slug: shop.slug }), function (e) { toast(errText(e), true); go.textContent = "Delete shop"; go.disabled = false; }).then(function (r) {
-        if (r !== FAIL) { toast("Shop deleted"); location.hash = "#/shops"; }
+      guarded(o.call(), function (e) { toast(errText(e), true); go.textContent = o.button; go.disabled = false; }).then(function (r) {
+        if (r !== FAIL) { toast(o.done); location.hash = o.hash; }
       });
     });
     wrap.appendChild(h("div", { class: "confirm" }, [
-      h("p", { text: "Type " + shop.name + " to confirm." }),
+      h("p", { text: "Type " + o.typed + " to confirm." }),
       h("div", { class: "field", style: "margin:0" }, [input]),
-      h("div", { class: "acts" }, [h("button", { class: "btn", type: "button", text: "Keep shop", onclick: function () { wrap.innerHTML = ""; } }), go])
+      h("div", { class: "acts" }, [h("button", { class: "btn", type: "button", text: o.keep, onclick: function () { wrap.innerHTML = ""; } }), go])
     ]));
     input.focus();
+  }
+  function showDelete(wrap, shop) {
+    confirmDelete(wrap, { typed: shop.name, button: "Delete shop", keep: "Keep shop", done: "Shop deleted", hash: "#/shops",
+      call: function () { return rpc("sq_admin_delete", { p_key: adminKey, p_slug: shop.slug }); } });
   }
 
   // ---------- QR sheet ----------
   var qrDialog = null;
-  function openQr(shop) {
-    var url = pageUrl(shop.slug), qr = qrcode(0, "M"); qr.addData(url); qr.make();
+  function openQr(shop) { openQrUrl({ title: shop.name, url: pageUrl(shop.slug), file: shop.slug + "-qr" }); }
+  function openQrUrl(o) {
+    var url = o.url, qr = qrcode(0, "M"); qr.addData(url); qr.make();
     var n = qr.getModuleCount(), margin = 4, cell = Math.max(4, Math.floor(1024 / (n + margin * 2))), size = cell * (n + margin * 2);
     var cv = document.createElement("canvas"); cv.width = size; cv.height = size;
     var g = cv.getContext("2d"); g.fillStyle = "#ffffff"; g.fillRect(0, 0, size, size); g.fillStyle = "#10131a";
     for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (qr.isDark(r, c)) g.fillRect((c + margin) * cell, (r + margin) * cell, cell, cell);
-    cv.setAttribute("aria-label", "QR code for " + shop.name);
+    cv.setAttribute("aria-label", "QR code for " + o.title);
 
     if (qrDialog) qrDialog.remove();
     qrDialog = h("dialog", { "aria-label": "QR code" });
     function blob(cb) { cv.toBlob(cb, "image/png"); }
+    function save(href, name) { var a = h("a", { href: href, download: name }); document.body.appendChild(a); a.click(); a.remove(); }
     var share = h("button", { class: "btn", type: "button", text: "Share", onclick: function () {
       blob(function (b) {
-        var f = new File([b], shop.slug + "-qr.png", { type: "image/png" });
-        if (navigator.canShare && navigator.canShare({ files: [f] })) navigator.share({ files: [f], title: shop.name }).catch(function () {});
+        var f = new File([b], o.file + ".png", { type: "image/png" });
+        if (navigator.canShare && navigator.canShare({ files: [f] })) navigator.share({ files: [f], title: o.title }).catch(function () {});
         else copy(url, "Link copied");
       });
     } });
     qrDialog.appendChild(h("div", { class: "sheet" }, [
-      h("h2", { text: shop.name }), h("p", { class: "muted", style: "margin:2px 0 0;word-break:break-all", text: url }), cv,
+      h("h2", { text: o.title }), h("p", { class: "muted", style: "margin:2px 0 0;word-break:break-all", text: url }),
+      tempAddress() ? h("p", { class: "warn", role: "alert", text: "This is a temporary address. Do not print this QR yet. Set your own domain first, or the printed QR will stop working." }) : null,
+      cv,
       h("div", { class: "acts" }, [
         h("button", { class: "btn primary", type: "button", text: "Download PNG", onclick: function () {
-          blob(function (b) { var a = h("a", { href: URL.createObjectURL(b), download: shop.slug + "-qr.png" }); document.body.appendChild(a); a.click(); a.remove(); });
+          blob(function (b) { save(URL.createObjectURL(b), o.file + ".png"); });
         } }),
         share,
-        h("button", { class: "btn wide", type: "button", text: "Close", onclick: function () { qrDialog.close(); } })
+        h("button", { class: "btn", type: "button", text: "Download SVG (print)", onclick: function () {
+          var svg = qr.createSvgTag({ cellSize: 10, margin: 4, scalable: true });
+          save(URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" })), o.file + ".svg");
+        } }),
+        h("button", { class: "btn", type: "button", text: "Close", onclick: function () { qrDialog.close(); } })
       ])
     ]));
     qrDialog.addEventListener("click", function (e) { if (e.target === qrDialog) qrDialog.close(); });
@@ -715,6 +897,9 @@
     if (p[0] === "shop" && p[1]) return viewEdit(decodeURIComponent(p[1]));
     if (p[0] === "settings") return viewSettings();
     if (p[0] === "shops") return viewList();
+    if (p[0] === "links") return viewLinks();
+    if (p[0] === "link" && p[1] === "new") return viewLinkEdit(null);
+    if (p[0] === "link" && p[1]) return viewLinkEdit(decodeURIComponent(p[1]));
     return viewDash();
   }
   window.addEventListener("hashchange", route);

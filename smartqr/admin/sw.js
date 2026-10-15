@@ -1,6 +1,6 @@
 // Smart QR Admin service worker: the app shell opens instantly and even offline.
 // Server calls (Supabase) are never cached, so the numbers and shops are always live.
-var CACHE = "sq-admin-v3";
+var CACHE = "sq-admin-v4";
 var SHELL = ["./", "style.css", "app.js", "vendor/qrcode.js", "manifest.webmanifest", "/config.js",
   "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png", "icons/favicon-32.png"];
 

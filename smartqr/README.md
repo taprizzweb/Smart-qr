@@ -17,6 +17,10 @@ Static site, no build step. Data lives in Supabase behind `security definer` fun
 4. Deploy on Vercel with root directory `smartqr`, then attach `smartqr.taprizz.in` (CNAME at the DNS host).
 5. Open `https://smartqr.taprizz.in/admin/` on the phone, enter the key, then Install / Add to Home Screen.
 
+## QR links
+
+Permanent QR codes of the form `<your-domain>/sq/<code>`. The printed QR never changes. In the admin (QR links tab) choose where each code opens (one of your shop pages or any https link), change it any time, pause it, or delete it. `api/sq.js` does the redirect (307, never cached) and only counts opens. Set `base` in `config.js` to your real domain before printing; until then the admin warns on `*.vercel.app` addresses.
+
 ## Admin
 
 Dashboard with totals across all shops (views, button taps, top shops). Create a shop (name, address, colour, logo photo, review/map/WhatsApp/Instagram, optional website, up to 6 of your own extra buttons (open a link, phone call, email), game on/off, live/paused), see page views and taps, copy the link, download the QR. Wrong keys are slowed and refused by the database.

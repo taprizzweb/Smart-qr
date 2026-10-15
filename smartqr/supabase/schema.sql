@@ -54,18 +54,40 @@ alter table public.sq_events drop constraint if exists sq_events_kind_check;
 alter table public.sq_events add constraint sq_events_kind_check
   check (kind in ('view', 'review', 'map', 'whatsapp', 'instagram', 'website', 'zomato', 'game', 'b0', 'b1', 'b2', 'b3', 'b4', 'b5'));
 
+-- Permanent QR links: <your-domain>/sq/<code>. The printed QR never changes; the destination can be changed any time.
+-- Counts only (how many times it was opened), no visitor data.
+create table if not exists public.sq_links (
+  id          uuid primary key default gen_random_uuid(),
+  code        text not null unique check (code ~ '^[a-z0-9-]{3,40}$'),
+  label       text check (length(label) <= 80),
+  target      text check (target is null or (target ~ '^https://[^[:space:]]+$' and length(target) <= 1000)),
+  shop_slug   text check (shop_slug is null or shop_slug ~ '^[a-z0-9-]{2,40}$'),
+  active      boolean not null default true,
+  clicks      bigint not null default 0,
+  last_opened timestamptz,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  check ((target is not null) <> (shop_slug is not null))
+);
+
+-- 'sq' is reserved so a shop page can never collide with the /sq/ links.
+alter table public.sq_shops drop constraint if exists sq_shops_slug_check;
+alter table public.sq_shops add constraint sq_shops_slug_check
+  check (slug ~ '^[a-z0-9-]{2,40}$' and slug not in ('admin', 'assets', 'vendor', 'icons', 'api', 'config', 'p', 'sw', 'sq'));
+
 alter table public.sq_settings enable row level security;
 alter table public.sq_shops    enable row level security;
 alter table public.sq_events   enable row level security;
+alter table public.sq_links    enable row level security;
 
 do $$
 begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
-    revoke all on public.sq_settings, public.sq_shops, public.sq_events from anon;
+    revoke all on public.sq_settings, public.sq_shops, public.sq_events, public.sq_links from anon;
     revoke all on sequence public.sq_events_id_seq from anon;
   end if;
   if exists (select 1 from pg_roles where rolname = 'authenticated') then
-    revoke all on public.sq_settings, public.sq_shops, public.sq_events from authenticated;
+    revoke all on public.sq_settings, public.sq_shops, public.sq_events, public.sq_links from authenticated;
     revoke all on sequence public.sq_events_id_seq from authenticated;
   end if;
 end $$;
@@ -251,6 +273,87 @@ begin
   );
 end $$;
 
+-- ---------------------------------------------------------------- QR links
+-- Public: what does /sq/<code> open? Returns {"target": "https://..."} or {"shop": "slug"}, or null when unknown or paused.
+-- Counts one open. No visitor data is stored.
+create or replace function public.sq_resolve(p_code text) returns jsonb
+language plpgsql volatile security definer set search_path = public, pg_catalog as $$
+declare l public.sq_links;
+begin
+  select * into l from public.sq_links where code = lower(coalesce(p_code, '')) and active;
+  if not found then return null; end if;
+  update public.sq_links set clicks = clicks + 1, last_opened = now() where id = l.id;
+  if l.target is not null then return jsonb_build_object('target', l.target); end if;
+  return jsonb_build_object('shop', l.shop_slug);
+end $$;
+
+create or replace function public.sq_link_json(l public.sq_links) returns jsonb
+language sql stable set search_path = public, pg_catalog as $$
+  select jsonb_build_object(
+    'code', l.code, 'label', l.label, 'target', l.target, 'shopSlug', l.shop_slug,
+    'shopName', (select name from public.sq_shops where slug = l.shop_slug),
+    'active', l.active, 'clicks', l.clicks, 'lastOpened', l.last_opened, 'createdAt', l.created_at)
+$$;
+
+create or replace function public.sq_admin_links(p_key text) returns jsonb
+language plpgsql stable security definer set search_path = public, pg_catalog as $$
+begin
+  perform sq_require_admin(p_key);
+  return (select coalesce(jsonb_agg(sq_link_json(l) order by l.created_at desc), '[]'::jsonb) from public.sq_links l);
+end $$;
+
+create or replace function public.sq_admin_link_get(p_key text, p_code text) returns jsonb
+language plpgsql stable security definer set search_path = public, pg_catalog as $$
+declare l public.sq_links;
+begin
+  perform sq_require_admin(p_key);
+  select * into l from public.sq_links where code = lower(coalesce(p_code, ''));
+  if not found then raise exception 'link_not_found'; end if;
+  return sq_link_json(l);
+end $$;
+
+-- Create (with "create": true, refuses an existing code) or update by code. The code never changes after creation.
+-- "target" (any https link) and "shopSlug" (one of your shop pages) are alternatives: setting one clears the other.
+create or replace function public.sq_admin_link_save(p_key text, p_link jsonb) returns jsonb
+language plpgsql volatile security definer set search_path = public, pg_catalog as $$
+declare
+  k text := lower(coalesce(p_link ->> 'code', '')); l public.sq_links; created boolean := false;
+  tg text := nullif(trim(coalesce(p_link ->> 'target', '')), '');
+  sh text := lower(nullif(trim(coalesce(p_link ->> 'shopSlug', '')), ''));
+begin
+  perform sq_require_admin(p_key);
+  if k !~ '^[a-z0-9-]{3,40}$' then raise exception 'code_check'; end if;
+  if tg is not null and sh is not null then raise exception 'destination_required'; end if;
+  if sh is not null and not exists (select 1 from public.sq_shops where slug = sh) then raise exception 'shop_not_found'; end if;
+  select * into l from public.sq_links where code = k;
+
+  if not found then
+    if tg is null and sh is null then raise exception 'destination_required'; end if;
+    insert into public.sq_links (code, target, shop_slug) values (k, tg, sh) returning * into l;
+    created := true;
+  elsif coalesce((p_link ->> 'create')::boolean, false) then
+    raise exception 'code_taken';
+  end if;
+
+  update public.sq_links set
+    label     = case when p_link ? 'label'  then nullif(trim(p_link ->> 'label'), '') else label end,
+    target    = case when tg is not null then tg when sh is not null then null else target end,
+    shop_slug = case when sh is not null then sh when tg is not null then null else shop_slug end,
+    active    = case when p_link ? 'active' then (p_link ->> 'active')::boolean else active end,
+    updated_at = now()
+  where id = l.id;
+
+  return jsonb_build_object('created', created, 'code', k);
+end $$;
+
+create or replace function public.sq_admin_link_delete(p_key text, p_code text) returns void
+language plpgsql volatile security definer set search_path = public, pg_catalog as $$
+begin
+  perform sq_require_admin(p_key);
+  delete from public.sq_links where code = lower(coalesce(p_code, ''));
+  if not found then raise exception 'link_not_found'; end if;
+end $$;
+
 -- ---------------------------------------------------------------- grants: only the public API is callable
 do $$
 declare f text;
@@ -274,7 +377,12 @@ begin
       public.sq_admin_save(text, jsonb),
       public.sq_admin_delete(text, text),
       public.sq_admin_stats(text, text, int),
-      public.sq_admin_overview(text, int)
+      public.sq_admin_overview(text, int),
+      public.sq_resolve(text),
+      public.sq_admin_links(text),
+      public.sq_admin_link_get(text, text),
+      public.sq_admin_link_save(text, jsonb),
+      public.sq_admin_link_delete(text, text)
     to anon, authenticated;
   end if;
 end $$;
