@@ -12,10 +12,19 @@ var SUPABASE_URL = process.env.SQ_SUPABASE_URL || "https://pjophsiodkctmyyfkpnm.
 var SUPABASE_KEY = process.env.SQ_SUPABASE_KEY || "sb_publishable_d55Z9QXsWQ7SStVMNpAIfw_kme_frrL";
 var MAX_TEXT = 90, MIN_TTL = 600, MAX_TTL = 7 * 24 * 3600;
 
+// Finds the store settings even if the integration added a prefix (for example STORAGE_KV_REST_API_URL).
+function envEnding(names) {
+  var keys = Object.keys(process.env), i, j;
+  for (j = 0; j < names.length; j++) {
+    if (process.env[names[j]]) return process.env[names[j]];
+    for (i = 0; i < keys.length; i++) if (keys[i].slice(-names[j].length - 1) === "_" + names[j] && process.env[keys[i]]) return process.env[keys[i]];
+  }
+  return "";
+}
 function cfg() {
   return {
-    url: process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || "",
-    token: process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || "",
+    url: envEnding(["UPSTASH_REDIS_REST_URL", "KV_REST_API_URL"]),
+    token: envEnding(["UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_TOKEN"]),
     secret: process.env.SQ_MANAGER_SECRET || ""
   };
 }
@@ -106,3 +115,5 @@ module.exports = function handler(req, res) {
     send(res, 400, { error: "action" });
   }).catch(function () { send(res, 503, { error: "store" }); });
 };
+
+module.exports._cfg = cfg;
