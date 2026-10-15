@@ -23,7 +23,7 @@ Permanent QR codes of the form `<your-domain>/sq/<code>`. The printed QR never c
 
 ## Today's deal (red announcement box)
 
-Per QR link (`/sq/<code>`): in the admin, open the QR link and tap **Get manager link**. The owner opens that private link on their phone, writes a short offer and picks how long it shows. They can change nothing else. The red box appears on the shop page only for visitors who came through that QR.
+Per QR link (`/sq/<code>`): in the admin, open the QR link and tap **Get manager link**. The owner opens that private link on their phone, writes a short offer and picks the date and time it should switch off (up to 7 days). They can change nothing else. The red box appears on the shop page only for visitors who came through that QR.
 
 The deal text is **not stored in Supabase**. It lives in a small Upstash Redis store and deletes itself when its time is over. One-time setup on Vercel (project -> Storage -> Create database -> Upstash Redis, connect it to the project; this adds `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`), plus an environment variable `SQ_MANAGER_SECRET` set to any long random text. Without these the box simply does not show.
 
