@@ -115,6 +115,8 @@
     if (/sq_links_target_check/.test(m)) return "The link must start with https://";
     if (/website_check/.test(m)) return "The website link must start with https://";
     if (/bad_buttons/.test(m)) return "One of the extra buttons is not valid. Check its name and link.";
+    if (/menu_url_check/.test(m)) return "The menu link must start with https://";
+    if (/facebook_check/.test(m)) return "The Facebook link must start with https://";
     if (/zomato_check/.test(m)) return "The Zomato link must start with https://";
     if (/instagram_check/.test(m)) return "Instagram must be a handle or an https:// link.";
     if (/whatsapp_check/.test(m)) return "WhatsApp number: digits only, with country code.";
@@ -161,6 +163,13 @@
     if (!d) return { ok: true, value: "" };
     if (d.length === 10) d = "91" + d;
     return d.length >= 8 && d.length <= 15 ? { ok: true, value: d } : { ok: false };
+  }
+  function normFb(v) {
+    v = (v || "").trim();
+    if (!v) return { ok: true, value: "" };
+    if (/^https?:\/\//i.test(v) || /^(www\.|m\.)?(facebook\.com|fb\.com|fb\.me)\//i.test(v)) { var u = normUrl(v); return u.ok && /^https:\/\/([a-z0-9-]+\.)*(facebook\.com|fb\.com|fb\.me)(\/|$|\?)/i.test(u.value) ? u : { ok: false }; }
+    var handle = v.replace(/^@/, "");
+    return /^[A-Za-z0-9.]{5,50}$/.test(handle) ? { ok: true, value: "https://www.facebook.com/" + handle } : { ok: false };
   }
   function waLabel(d) { return /^91\d{10}$/.test(d) ? "+91 " + d.slice(2, 7) + " " + d.slice(7) : "+" + d; }
 
@@ -285,7 +294,7 @@
     ]);
   }
 
-  var TAP_LABELS = [["review", "AI review"], ["map", "Location"], ["whatsapp", "WhatsApp"], ["instagram", "Instagram"], ["website", "Website"], ["zomato", "Zomato"], ["custom", "Extra buttons"], ["game", "Game opens"]];
+  var TAP_LABELS = [["review", "AI review"], ["map", "Location"], ["whatsapp", "WhatsApp"], ["instagram", "Instagram"], ["website", "Website"], ["menu", "Menu"], ["facebook", "Facebook"], ["zomato", "Zomato"], ["custom", "Extra buttons"], ["game", "Game opens"]];
 
   function viewDash() {
     current = "dash";
@@ -602,7 +611,7 @@
   function viewEdit(slug) {
     current = "edit";
     var isNew = !slug;
-    var blank = { slug: "", name: "", address: "", color: "#2563eb", reviewUrl: "", mapUrl: "", whatsapp: "", instagram: "", website: "", zomato: "", buttons: [], gameOn: true, active: true, logo: null, logoThumb: null };
+    var blank = { slug: "", name: "", address: "", color: "#2563eb", reviewUrl: "", mapUrl: "", whatsapp: "", instagram: "", website: "", zomato: "", menuUrl: "", facebook: "", buttons: [], gameOn: true, active: true, logo: null, logoThumb: null };
     screen([h("div", { class: "top" }, [h("a", { class: "back", href: "#/shops" }, [icon(ICONS.back, 20), "Shops"])]), h("div", { class: "skeleton" }), h("div", { class: "skeleton" })]);
     var linksP = rpc("sq_admin_links", { p_key: adminKey }).catch(function () { return []; });
     if (isNew) { linksP.then(function (l) { build(blank, l); }); return; }
@@ -613,7 +622,7 @@
 
     function build(src, links) {
       var st = JSON.parse(JSON.stringify(src));
-      ["address", "reviewUrl", "mapUrl", "whatsapp", "instagram", "website", "zomato"].forEach(function (k) { if (st[k] == null) st[k] = ""; });
+      ["address", "reviewUrl", "mapUrl", "whatsapp", "instagram", "website", "zomato", "menuUrl", "facebook"].forEach(function (k) { if (st[k] == null) st[k] = ""; });
       st.buttons = (st.buttons || []).map(function (b) { return { kind: b.kind, label: b.label, value: b.kind === "call" ? waLabel(b.value) : b.value }; });
       st.qrCode = "";
       st.color = String(st.color || "#2563eb").toLowerCase();
@@ -631,6 +640,8 @@
         var two = h("div", { class: "two" }, []);
         two.appendChild(h("i")); if (st.whatsappRaw) two.appendChild(h("i"));
         var more = [];
+        if (st.menuUrl.trim()) more.push(h("i"));
+        if (st.facebook.trim()) more.push(h("i"));
         if (st.website.trim()) more.push(h("i"));
         if (st.zomato.trim()) more.push(h("i", { style: "background:#e23744" }));
         st.buttons.forEach(function () { more.push(h("i")); });
@@ -673,6 +684,8 @@
       var qrList = myLinks.length ? h("div", { class: "chips" }, myLinks.map(function (l) {
         return h("a", { class: "chip", href: "#/link/" + encodeURIComponent(l.code) }, [l.code, h("small", { text: l.clicks + (l.clicks === 1 ? " open" : " opens") })]);
       })) : null;
+      var menuIn = bind(h("input", { id: "f-menu", type: "url", value: st.menuUrl, inputmode: "url", autocomplete: "off", autocapitalize: "none", placeholder: "Link to your menu (website, PDF, Drive)" }), "menuUrl");
+      var fbIn = bind(h("input", { id: "f-fb", type: "text", value: st.facebook, autocomplete: "off", autocapitalize: "none", spellcheck: "false", placeholder: "Page name or facebook.com link" }), "facebook");
       var zomato = bind(h("input", { id: "f-zomato", type: "url", value: st.zomato, inputmode: "url", autocomplete: "off", autocapitalize: "none", placeholder: "Paste the Zomato restaurant link" }), "zomato");
 
       // extra buttons (owner's own: menu, booking, offer, call, email...)
@@ -762,6 +775,8 @@
         var u2 = normUrl(st.mapUrl); if (!u2.ok) return err(map, "Enter a link that starts with https://");
         var w = normWa(st.whatsappRaw); if (!w.ok) return err(wa, "Enter a valid WhatsApp number.");
         var i = normIg(st.instagramRaw); if (!i.ok) return err(ig, "Enter an Instagram handle like @shopname, or a link.");
+        var mu = normUrl(st.menuUrl); if (!mu.ok) return err(menuIn, "Enter the menu link, it starts with https://");
+        var fbn = normFb(st.facebook); if (!fbn.ok) return err(fbIn, "Enter your Facebook page name or a facebook.com link.");
         var wb = normUrl(st.website); if (!wb.ok) return err(website, "Enter a website like www.yourshop.com");
         var zm = normUrl(st.zomato); if (!zm.ok) return err(zomato, "Enter the Zomato link, it starts with https://");
         if (zm.value && !/^https:\/\/([a-z0-9-]+\.)*(zomato\.com|zoma\.to)(\/|$|\?)/i.test(zm.value)) return err(zomato, "This does not look like a Zomato link (zomato.com or zoma.to).");
@@ -777,7 +792,7 @@
         var qrNo = st.qrCode.trim();
         if (qrNo && !/^[a-z0-9-]{3,40}$/.test(qrNo)) return err(qrIn, "QR number: 3 to 40 letters, numbers or hyphens, like " + nextNo + ".");
         var body = { slug: isNew ? sg : st.slug, name: nm, address: st.address.trim(), color: st.color, reviewUrl: u1.value, mapUrl: u2.value,
-          whatsapp: w.value, instagram: i.value, website: wb.value, zomato: zm.value, buttons: btns, gameOn: !!st.gameOn, active: !!st.active };
+          whatsapp: w.value, instagram: i.value, website: wb.value, zomato: zm.value, menuUrl: mu.value, facebook: fbn.value, buttons: btns, gameOn: !!st.gameOn, active: !!st.active };
         if (st.logoChanged) { body.logo = st.logo; body.logoThumb = st.logoThumb; }
         if (qrNo) body.qrCode = qrNo;
         saveBtn.disabled = true; saveBtn.textContent = "Saving...";
@@ -814,7 +829,9 @@
           field("AI review link", "f-review", review, "Leave empty to hide the AI Review button."),
           field("Location link", "f-map", map, "Empty uses a Google Maps search for the shop name and address."),
           field("WhatsApp number", "f-wa", wa, waHint),
+          field("Menu", "f-menu", menuIn, "Optional. Shows a View our menu button with a food icon. Empty hides it."),
           field("Instagram", "f-ig", ig, "Empty hides the Instagram button."),
+          field("Facebook", "f-fb", fbIn, "Optional. Page name or link. Empty hides the Facebook button."),
           field("Website", "f-web", website, "Optional. Empty hides the website button."),
           field("Zomato", "f-zomato", zomato, "Optional. Shows a red Zomato button. Empty hides it."),
           toggle("gameOn", "Quick game button", "A fun spin wheel. Nothing is saved.")]),
@@ -836,6 +853,8 @@
             var c = r.counts || {}, max = Math.max.apply(null, r.daily.map(function (d) { return d.views; }).concat([1]));
             statsBox.innerHTML = "";
             var rows = [["view", "Page views"], ["review", "AI review taps"], ["map", "Location taps"], ["whatsapp", "WhatsApp taps"], ["instagram", "Instagram taps"]];
+            if (src.menuUrl) rows.push(["menu", "Menu taps"]);
+            if (src.facebook) rows.push(["facebook", "Facebook taps"]);
             if (src.website) rows.push(["website", "Website taps"]);
             if (src.zomato) rows.push(["zomato", "Zomato taps"]);
             (src.buttons || []).forEach(function (b, i) { rows.push(["b" + i, b.label + " taps"]); });

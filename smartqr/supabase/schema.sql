@@ -29,6 +29,8 @@ create table if not exists public.sq_shops (
   instagram   text check (instagram is null or instagram ~ '^https://'),
   website     text check (website is null or website ~ '^https://'),
   zomato      text check (zomato is null or zomato ~ '^https://'),
+  menu_url    text check (menu_url is null or menu_url ~ '^https://'),
+  facebook    text check (facebook is null or facebook ~ '^https://'),
   buttons     jsonb not null default '[]'::jsonb check (jsonb_typeof(buttons) = 'array' and jsonb_array_length(buttons) <= 6),
   game_on     boolean not null default true,
   active      boolean not null default true,
@@ -40,7 +42,7 @@ create table if not exists public.sq_shops (
 create table if not exists public.sq_events (
   id         bigserial primary key,
   shop_id    uuid not null references public.sq_shops(id) on delete cascade,
-  kind       text not null check (kind in ('view', 'review', 'map', 'whatsapp', 'instagram', 'website', 'zomato', 'game', 'b0', 'b1', 'b2', 'b3', 'b4', 'b5')),
+  kind       text not null check (kind in ('view', 'review', 'map', 'whatsapp', 'instagram', 'website', 'zomato', 'menu', 'facebook', 'game', 'b0', 'b1', 'b2', 'b3', 'b4', 'b5')),
   created_at timestamptz not null default now()
 );
 create index if not exists sq_events_shop_time on public.sq_events (shop_id, created_at desc);
@@ -48,11 +50,13 @@ create index if not exists sq_events_shop_time on public.sq_events (shop_id, cre
 -- Upgrade path for databases created before the website / extra buttons existed (safe to re-run).
 alter table public.sq_shops add column if not exists website text check (website is null or website ~ '^https://');
 alter table public.sq_shops add column if not exists zomato text check (zomato is null or zomato ~ '^https://');
+alter table public.sq_shops add column if not exists menu_url text check (menu_url is null or menu_url ~ '^https://');
+alter table public.sq_shops add column if not exists facebook text check (facebook is null or facebook ~ '^https://');
 alter table public.sq_shops add column if not exists buttons jsonb not null default '[]'::jsonb
   check (jsonb_typeof(buttons) = 'array' and jsonb_array_length(buttons) <= 6);
 alter table public.sq_events drop constraint if exists sq_events_kind_check;
 alter table public.sq_events add constraint sq_events_kind_check
-  check (kind in ('view', 'review', 'map', 'whatsapp', 'instagram', 'website', 'zomato', 'game', 'b0', 'b1', 'b2', 'b3', 'b4', 'b5'));
+  check (kind in ('view', 'review', 'map', 'whatsapp', 'instagram', 'website', 'zomato', 'menu', 'facebook', 'game', 'b0', 'b1', 'b2', 'b3', 'b4', 'b5'));
 
 -- Permanent QR links: <your-domain>/sq/<code>. The printed QR never changes; the destination can be changed any time.
 -- Counts only (how many times it was opened), no visitor data.
@@ -137,7 +141,7 @@ language sql stable as $$
   select jsonb_build_object(
     'slug', s.slug, 'name', s.name, 'address', s.address, 'color', s.color,
     'reviewUrl', s.review_url, 'mapUrl', s.map_url, 'whatsapp', s.whatsapp, 'instagram', s.instagram,
-    'website', s.website, 'zomato', s.zomato, 'buttons', s.buttons,
+    'website', s.website, 'zomato', s.zomato, 'menuUrl', s.menu_url, 'facebook', s.facebook, 'buttons', s.buttons,
     'gameOn', s.game_on, 'active', s.active, 'updatedAt', s.updated_at
   ) || case when with_logo then jsonb_build_object('logo', s.logo) else jsonb_build_object('logoThumb', s.logo_thumb) end
 $$;
@@ -156,7 +160,7 @@ create or replace function public.sq_log(p_slug text, p_kind text) returns void
 language plpgsql volatile security definer set search_path = public, pg_catalog as $$
 declare sid uuid;
 begin
-  if p_kind not in ('view', 'review', 'map', 'whatsapp', 'instagram', 'website', 'zomato', 'game', 'b0', 'b1', 'b2', 'b3', 'b4', 'b5') then return; end if;
+  if p_kind not in ('view', 'review', 'map', 'whatsapp', 'instagram', 'website', 'zomato', 'menu', 'facebook', 'game', 'b0', 'b1', 'b2', 'b3', 'b4', 'b5') then return; end if;
   select id into sid from public.sq_shops where slug = lower(coalesce(p_slug, '')) and active;
   if sid is not null then insert into public.sq_events (shop_id, kind) values (sid, p_kind); end if;
 end $$;
@@ -215,6 +219,8 @@ begin
     instagram  = case when p_shop ? 'instagram' then nullif(trim(p_shop ->> 'instagram'), '') else instagram end,
     website    = case when p_shop ? 'website'   then nullif(trim(p_shop ->> 'website'), '')   else website end,
     zomato     = case when p_shop ? 'zomato'    then nullif(trim(p_shop ->> 'zomato'), '')    else zomato end,
+    menu_url   = case when p_shop ? 'menuUrl'   then nullif(trim(p_shop ->> 'menuUrl'), '')   else menu_url end,
+    facebook   = case when p_shop ? 'facebook'  then nullif(trim(p_shop ->> 'facebook'), '')  else facebook end,
     buttons    = case when p_shop ? 'buttons'   then sq_clean_buttons(p_shop -> 'buttons')    else buttons end,
     game_on    = case when p_shop ? 'gameOn'    then (p_shop ->> 'gameOn')::boolean           else game_on end,
     active     = case when p_shop ? 'active'    then (p_shop ->> 'active')::boolean           else active end,
