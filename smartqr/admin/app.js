@@ -503,8 +503,8 @@
         }, function () { btn.disabled = false; toast("No connection. Check your internet and try again.", true); });
     }
     btn.addEventListener("click", function () { request(false); });
-    return h("div", { class: "card" }, [h("h2", { text: "Today's deal (for the owner)" }),
-      h("p", { class: "muted", style: "margin:0 0 12px", text: "Give the owner a private link. They can only write the red Today's deal box for this QR. Nothing else. The text is not saved in your database and removes itself when its time is over." }),
+    return h("div", { class: "card" }, [h("h2", { text: "Deal and information (for the owner)" }),
+      h("p", { class: "muted", style: "margin:0 0 12px", text: "Give the owner a private link. They can only write two boxes for this QR: the red Today's deal and a note under Information. Nothing else. The text is not saved in your database. A deal removes itself when its time is over." }),
       btn, out]);
   }
 

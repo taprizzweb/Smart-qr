@@ -21,9 +21,9 @@ Static site, no build step. Data lives in Supabase behind `security definer` fun
 
 Permanent QR codes of the form `<your-domain>/sq/<code>`. The printed QR never changes. In the admin (QR links tab) choose where each code opens (one of your shop pages or any https link), change it any time, pause it, or delete it. `api/sq.js` does the redirect (307, never cached) and only counts opens. Set `base` in `config.js` to your real domain before printing; until then the admin warns on `*.vercel.app` addresses.
 
-## Today's deal (red announcement box)
+## Today's deal (red box) and Information (note box)
 
-Per QR link (`/sq/<code>`): in the admin, open the QR link and tap **Get manager link**. The owner opens that private link on their phone, writes a short offer and picks the date and time it should switch off (up to 7 days). They can change nothing else. The red box appears on the shop page only for visitors who came through that QR.
+Per QR link (`/sq/<code>`): in the admin, open the QR link and tap **Get manager link**. The owner opens that private link on their phone, writes a short offer and picks the date and time it should switch off (up to 7 days). They can change nothing else. The same private link also has an **Information** box (a note such as closed days or timings, which can stay until removed). The boxes appear on the shop page only for visitors who came through that QR.
 
 The deal text is **not stored in Supabase**. It lives in a small Upstash Redis store and deletes itself when its time is over. One-time setup on Vercel (project -> Storage -> Create database -> Upstash Redis, connect it to the project; this adds `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`), plus an environment variable `SQ_MANAGER_SECRET` set to any long random text. Without these the box simply does not show.
 

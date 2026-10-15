@@ -1,16 +1,22 @@
-// "Today's deal" announcement for one QR link (/sq/<code>). One small function, five actions:
-//   GET  ?a=get&c=<code>        public: the live deal text for that QR, or {}
+// "Today's deal" (red box) and "Information" (note box) for one QR link (/sq/<code>). One small function, five actions:
+//   GET  ?a=get&c=<code>        public: {text} (deal) and/or {note}, or {}
 //   GET  ?a=me&t=<token>        manager: what is live now
-//   POST ?a=set                 manager: {t, text, ttl}    (ttl = seconds, up to 7 days)
-//   POST ?a=clear               manager: {t}
+//   POST ?a=set                 manager: {t, k: "deal"|"note", text, ttl}   (ttl = seconds, up to 7 days; a note may use 0 = until removed)
+//   POST ?a=clear               manager: {t, k}
 //   POST ?a=link                admin:   {key, code, reset} -> the private manager link for that QR
-// The deal text lives ONLY in a small Redis store (Upstash) and deletes itself when it expires. Nothing is written to Supabase.
+// The text lives ONLY in a small Redis store (Upstash). A deal always deletes itself when it expires. Nothing is written to Supabase.
 // Needs two settings on Vercel: the Redis store (UPSTASH_REDIS_REST_URL / _TOKEN, added by the Upstash integration)
 // and SQ_MANAGER_SECRET (any long random text). Without them the page simply shows no deal.
 var crypto = require("crypto");
 var SUPABASE_URL = process.env.SQ_SUPABASE_URL || "https://pjophsiodkctmyyfkpnm.supabase.co";
 var SUPABASE_KEY = process.env.SQ_SUPABASE_KEY || "sb_publishable_d55Z9QXsWQ7SStVMNpAIfw_kme_frrL";
-var MAX_TEXT = 90, MIN_TTL = 600, MAX_TTL = 7 * 24 * 3600;
+var MAX_TEXT = 90, MAX_NOTE = 200, MIN_TTL = 600, MAX_TTL = 7 * 24 * 3600;
+var KEYS = { deal: "sq:offer:", note: "sq:note:" };
+function kindOf(v) { return v === "note" ? "note" : "deal"; }
+function parseEntry(raw) {
+  var o = null; try { o = raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+  return o && o.t && (!o.u || o.u * 1000 > Date.now()) ? o : null;
+}
 
 // Finds the store settings even if the integration added a prefix (for example STORAGE_KV_REST_API_URL).
 function envEnding(names) {
@@ -58,6 +64,10 @@ function verify(c, t) {
   return redis(c, ["GET", "sq:salt:" + code]).then(function (salt) { return same(sig, sign(c, code, salt)) ? code : null; });
 }
 function cleanText(v) { return String(v == null ? "" : v).replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim(); }
+// A note may have a few short lines.
+function cleanNote(v) {
+  return String(v == null ? "" : v).replace(/\r\n?/g, "\n").replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, " ").split("\n").map(function (l) { return l.replace(/[ \t]+/g, " ").trim(); }).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
 
 module.exports = function handler(req, res) {
   var a = String((req.query && req.query.a) || ""), c = cfg();
@@ -66,10 +76,11 @@ module.exports = function handler(req, res) {
   if (a === "get") {
     var code = String((req.query && req.query.c) || "").toLowerCase();
     if (!/^[a-z0-9-]{3,40}$/.test(code) || !c.url || !c.token) return send(res, 200, {}, "public, s-maxage=15, stale-while-revalidate=30");
-    return redis(c, ["GET", "sq:offer:" + code]).then(function (raw) {
-      var o = null; try { o = raw ? JSON.parse(raw) : null; } catch (e) { /* ignore */ }
-      if (!o || !o.t || (o.u && o.u * 1000 < Date.now())) return send(res, 200, {}, "public, s-maxage=15, stale-while-revalidate=30");
-      send(res, 200, { text: o.t }, "public, s-maxage=15, stale-while-revalidate=30");
+    return redis(c, ["MGET", KEYS.deal + code, KEYS.note + code]).then(function (r) {
+      var d = parseEntry(r && r[0]), n = parseEntry(r && r[1]), out = {};
+      if (d) out.text = d.t;
+      if (n) out.note = n.t;
+      send(res, 200, out, "public, s-maxage=15, stale-while-revalidate=30");
     }).catch(function () { send(res, 200, {}); });
   }
   if (!configured) return send(res, 503, { error: "not_configured" });
@@ -77,10 +88,9 @@ module.exports = function handler(req, res) {
   if (a === "me" && req.method === "GET") {
     return verify(c, req.query && req.query.t).then(function (code) {
       if (!code) return send(res, 403, { error: "bad_link" });
-      return redis(c, ["GET", "sq:offer:" + code]).then(function (raw) {
-        var o = null; try { o = raw ? JSON.parse(raw) : null; } catch (e) { /* ignore */ }
-        if (o && o.u && o.u * 1000 < Date.now()) o = null;
-        send(res, 200, { code: code, text: o ? o.t : "", until: o ? o.u : 0 });
+      return redis(c, ["MGET", KEYS.deal + code, KEYS.note + code]).then(function (r) {
+        var d = parseEntry(r && r[0]), n = parseEntry(r && r[1]);
+        send(res, 200, { code: code, text: d ? d.t : "", until: d ? d.u : 0, note: { text: n ? n.t : "", until: n ? n.u : 0, live: !!n } });
       });
     }).catch(function () { send(res, 503, { error: "store" }); });
   }
@@ -90,12 +100,14 @@ module.exports = function handler(req, res) {
     if (a === "set" || a === "clear") {
       return verify(c, b.t).then(function (code) {
         if (!code) return send(res, 403, { error: "bad_link" });
-        if (a === "clear") return redis(c, ["DEL", "sq:offer:" + code]).then(function () { send(res, 200, { ok: true }); });
-        var text = cleanText(b.text), ttl = Math.floor(Number(b.ttl));
-        if (text.length < 3 || text.length > MAX_TEXT) return send(res, 400, { error: "text" });
+        var kind = kindOf(b.k), key = KEYS[kind] + code;
+        if (a === "clear") return redis(c, ["DEL", key]).then(function () { send(res, 200, { ok: true }); });
+        var note = kind === "note", text = note ? cleanNote(b.text) : cleanText(b.text), ttl = Math.floor(Number(b.ttl));
+        if (text.length < 3 || text.length > (note ? MAX_NOTE : MAX_TEXT) || (note && text.split("\n").length > 6)) return send(res, 400, { error: "text" });
+        if (note && ttl === 0) return redis(c, ["SET", key, JSON.stringify({ t: text, u: 0 })]).then(function () { send(res, 200, { ok: true, until: 0 }); });
         if (!(ttl >= MIN_TTL && ttl <= MAX_TTL)) return send(res, 400, { error: "ttl" });
         var until = Math.floor(Date.now() / 1000) + ttl;
-        return redis(c, ["SET", "sq:offer:" + code, JSON.stringify({ t: text, u: until }), "EX", String(ttl)]).then(function () { send(res, 200, { ok: true, until: until }); });
+        return redis(c, ["SET", key, JSON.stringify({ t: text, u: until }), "EX", String(ttl)]).then(function () { send(res, 200, { ok: true, until: until }); });
       });
     }
     if (a === "link") {
@@ -109,7 +121,7 @@ module.exports = function handler(req, res) {
         if (!r.ok) return send(res, 403, { error: "forbidden" });
         var next = b.reset ? crypto.randomBytes(9).toString("hex") : null;
         var step = next ? redis(c, ["SET", "sq:salt:" + code, next]).then(function () { return next; }) : redis(c, ["GET", "sq:salt:" + code]);
-        return step.then(function (salt) { return (b.reset ? redis(c, ["DEL", "sq:offer:" + code]) : Promise.resolve()).then(function () { send(res, 200, { code: code, token: code + "." + sign(c, code, salt) }); }); });
+        return step.then(function (salt) { return (b.reset ? redis(c, ["DEL", KEYS.deal + code]).then(function () { return redis(c, ["DEL", KEYS.note + code]); }) : Promise.resolve()).then(function () { send(res, 200, { code: code, token: code + "." + sign(c, code, salt) }); }); });
       });
     }
     send(res, 400, { error: "action" });
