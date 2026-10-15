@@ -23,6 +23,16 @@
     textarea { min-height: 96px; resize: vertical; }
     .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--muted); }
     .field + .field { margin-top: 14px; }
+    .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; border-radius: 14px; background: #eef0f3; margin-bottom: 10px; }
+    .seg button { min-height: 44px; border: 0; border-radius: 10px; background: transparent; font: 500 15px/1 var(--font); color: var(--muted); cursor: pointer; }
+    .seg button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(16,19,26,0.15); }
+    .seg.sm { margin-bottom: 10px; } .seg.sm button { min-height: 40px; font-size: 14px; }
+    .time { display: flex; align-items: center; gap: 8px; }
+    .time input { width: 100%; min-width: 0; font: inherit; font-size: 20px; font-weight: 500; text-align: center; padding: 12px 6px; border-radius: 12px; border: 1px solid var(--line); background: #fff; color: var(--ink); }
+    .time span { font-size: 16px; color: var(--muted); flex: none; }
+    .time .seg { margin: 0; width: 120px; flex: none; }
+    .end { margin: 10px 0 0; padding: 10px 12px; border-radius: 12px; background: #fff1f3; color: #9f1239; font-size: 14px; font-weight: 500; }
+    .end:empty { display: none; }
     .btn { width: 100%; min-height: 52px; border-radius: 14px; border: 1px solid var(--line); background: #fff; font: 500 16px/1 var(--font); color: var(--ink); cursor: pointer; margin-top: 12px; }
     .btn.primary { background: #be123c; border-color: #be123c; color: #fff; }
     .btn:disabled { opacity: 0.55; }
@@ -51,8 +61,27 @@
       </div>
       <div class="card">
         <div class="field"><label for="text">Your offer</label><textarea id="text" maxlength="90" placeholder="Cold Coffee Rs 99, 4 pm to 7 pm"></textarea><div class="row"><span>Short and clear works best.</span><span id="cnt">0/90</span></div></div>
-        <div class="field"><label for="until">Show it until</label>
-          <input id="until" type="datetime-local" step="60"><div class="row"><span>Pick the date and time it should switch off. Up to 7 days.</span></div></div>
+        <div class="field"><label>How long should it show?</label>
+          <div class="seg" role="group" aria-label="How to set the time"><button type="button" id="mUntil" class="on" aria-pressed="true">Until a time</button><button type="button" id="mFor" aria-pressed="false">For how long</button></div>
+          <div id="pUntil">
+            <div class="seg sm" id="days" role="group" aria-label="Day"><button type="button" data-d="0" class="on" aria-pressed="true">Today</button><button type="button" data-d="1" aria-pressed="false">Tomorrow</button></div>
+            <div class="time">
+              <input id="hh" type="number" inputmode="numeric" min="1" max="12" placeholder="Hour" aria-label="Hour">
+              <span>:</span>
+              <input id="mm" type="number" inputmode="numeric" min="0" max="59" placeholder="Min" aria-label="Minutes">
+              <div class="seg sm" id="ap" role="group" aria-label="AM or PM"><button type="button" data-a="am" aria-pressed="false">AM</button><button type="button" data-a="pm" class="on" aria-pressed="true">PM</button></div>
+            </div>
+          </div>
+          <div id="pFor" hidden>
+            <div class="time">
+              <input id="dh" type="number" inputmode="numeric" min="0" max="168" placeholder="Hours" aria-label="Hours">
+              <span>hrs</span>
+              <input id="dm" type="number" inputmode="numeric" min="0" max="59" placeholder="Mins" aria-label="Minutes">
+              <span>mins</span>
+            </div>
+          </div>
+          <p class="end" id="end" role="status"></p>
+          <div class="row"><span>At least 10 minutes, up to 7 days.</span></div></div>
         <button class="btn primary" id="save" type="button">Show on my page</button>
         <button class="btn" id="clear" type="button">Remove the deal</button>
         <p class="msg" id="msg" role="status"></p>
@@ -77,19 +106,51 @@
         $("cnt").textContent = text.value.length + "/90";
         $("pv").textContent = v || "Your offer shows here"; fit($("pv"), null, 30, 15);
       }
-      // The owner picks the end time on their own phone, so it is read in their own time zone.
-      function two(n) { return (n < 10 ? "0" : "") + n; }
-      function toInput(d) { return d.getFullYear() + "-" + two(d.getMonth() + 1) + "-" + two(d.getDate()) + "T" + two(d.getHours()) + ":" + two(d.getMinutes()); }
+      // The owner types hours and minutes (either a clock time or a length of time). Read in the phone's own time zone.
+      var mode = "until", day = 0, ap = "pm";
+      function pick(group, attr, val) {
+        Array.prototype.forEach.call(group.querySelectorAll("button"), function (b) { var on = b.getAttribute(attr) === String(val); b.classList.toggle("on", on); b.setAttribute("aria-pressed", on ? "true" : "false"); });
+      }
+      function num(el) { var n = parseInt(el.value, 10); return isNaN(n) ? null : n; }
+      function endDate() {
+        var now = new Date();
+        if (mode === "until") {
+          var h = num($("hh")), m = num($("mm")); if (m === null) m = 0;
+          if (h === null || h < 1 || h > 12 || m < 0 || m > 59) return null;
+          var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + day, (h % 12) + (ap === "pm" ? 12 : 0), m, 0, 0);
+          return d;
+        }
+        var hr = num($("dh")), mi = num($("dm")); if (hr === null) hr = 0; if (mi === null) mi = 0;
+        if (hr < 0 || mi < 0 || mi > 59 || hr > 168) return null;
+        var total = hr * 60 + mi; return total > 0 ? new Date(now.getTime() + total * 60000) : null;
+      }
+      function fmt(d) { return d.toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }); }
+      function seconds() { var d = endDate(); return d ? Math.floor((d.getTime() - Date.now()) / 1000) : NaN; }
+      function showEnd() {
+        var d = endDate(), el = $("end");
+        if (!d) { el.textContent = ""; return; }
+        var secs = Math.floor((d.getTime() - Date.now()) / 1000);
+        el.textContent = secs < 600 ? "That is too soon. Pick a time at least 10 minutes from now (try Tomorrow)." : "Switches off " + fmt(d);
+      }
+      function setMode(m) {
+        mode = m; $("mUntil").classList.toggle("on", m === "until"); $("mFor").classList.toggle("on", m === "for");
+        $("mUntil").setAttribute("aria-pressed", m === "until" ? "true" : "false"); $("mFor").setAttribute("aria-pressed", m === "for" ? "true" : "false");
+        $("pUntil").hidden = m !== "until"; $("pFor").hidden = m !== "for"; showEnd();
+      }
+      function fillClock(d) {
+        var h = d.getHours(); ap = h >= 12 ? "pm" : "am"; $("hh").value = String(h % 12 === 0 ? 12 : h % 12); $("mm").value = ("0" + d.getMinutes()).slice(-2); pick($("ap"), "data-a", ap);
+        var today = new Date(); day = d.toDateString() === today.toDateString() ? 0 : 1; pick($("days"), "data-d", day);
+      }
       function defaultEnd() {
         var now = new Date(), t = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 0, 0);
         if (t.getTime() - now.getTime() < 3600 * 1000) t = new Date(now.getTime() + 3 * 3600 * 1000);
         return t;
       }
-      function limits() { var now = Date.now(); $("until").min = toInput(new Date(now + 10 * 60 * 1000)); $("until").max = toInput(new Date(now + 7 * 24 * 3600 * 1000)); }
-      function seconds() {
-        var v = $("until").value; if (!v) return NaN;
-        return Math.floor((new Date(v).getTime() - Date.now()) / 1000);
-      }
+      $("mUntil").addEventListener("click", function () { setMode("until"); });
+      $("mFor").addEventListener("click", function () { setMode("for"); });
+      $("days").addEventListener("click", function (e) { var b = e.target.closest("button"); if (!b) return; day = +b.getAttribute("data-d"); pick($("days"), "data-d", day); showEnd(); });
+      $("ap").addEventListener("click", function (e) { var b = e.target.closest("button"); if (!b) return; ap = b.getAttribute("data-a"); pick($("ap"), "data-a", ap); showEnd(); });
+      ["hh", "mm", "dh", "dm"].forEach(function (id) { $(id).addEventListener("input", showEnd); });
       function call(action, body) {
         return fetch("/api/offer?a=" + action, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
           .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); });
@@ -99,12 +160,13 @@
         var v = text.value.replace(/\s+/g, " ").trim();
         if (v.length < 3) return say("Please write your offer first.", false);
         var secs = seconds();
+        if (isNaN(secs)) return say("Please fill the hour and minutes.", false);
         if (!(secs >= 600)) return say("Pick a time at least 10 minutes from now.", false);
         if (secs > 7 * 24 * 3600) return say("You can show a deal for up to 7 days.", false);
         var b = this; b.disabled = true; say("Saving...", true);
         call("set", { t: token, text: v, ttl: secs }).then(function (r) {
           b.disabled = false;
-          if (r.ok) say("Done. It is live now and switches off at " + new Date($("until").value).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) + ".", true);
+          if (r.ok) say("Done. It is live now and switches off " + fmt(new Date(Date.now() + secs * 1000)) + ".", true);
           else say(r.j.error === "bad_link" ? "This link is no longer valid." : "Could not save. Please try again.", false);
         }, function () { b.disabled = false; say("No connection. Please try again.", false); });
       });
@@ -112,7 +174,7 @@
         var b = this; b.disabled = true; say("Removing...", true);
         call("clear", { t: token }).then(function (r) {
           b.disabled = false;
-          if (r.ok) { text.value = ""; paint(); $("until").value = toInput(defaultEnd()); say("Removed. The deal is off your page.", true); } else say("Could not remove. Please try again.", false);
+          if (r.ok) { text.value = ""; paint(); fillClock(defaultEnd()); showEnd(); say("Removed. The deal is off your page.", true); } else say("Could not remove. Please try again.", false);
         }, function () { b.disabled = false; say("No connection. Please try again.", false); });
       });
 
@@ -120,8 +182,8 @@
         if (r.s === 503) { $("off").hidden = false; return; }
         if (r.s !== 200) { $("bad").hidden = false; return; }
         $("who").textContent = "For QR " + r.j.code + ". Only this deal can be changed here.";
-        text.value = r.j.text || ""; $("app").hidden = false; paint(); limits();
-        $("until").value = toInput(r.j.until ? new Date(r.j.until * 1000) : defaultEnd());
+        text.value = r.j.text || ""; $("app").hidden = false; paint();
+        fillClock(r.j.until ? new Date(r.j.until * 1000) : defaultEnd()); showEnd();
         if (r.j.until) say("Live now. It ends on " + new Date(r.j.until * 1000).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) + ".", true);
       }, function () { $("bad").hidden = false; });
     })();
