@@ -474,6 +474,40 @@
     });
   }
 
+  // Owner access for the red "Today's deal" box. The owner gets one private link and can change nothing else.
+  function dealCard(src) {
+    var out = h("div"), btn = h("button", { class: "btn small", type: "button", text: "Get manager link" });
+    function show(token, fresh) {
+      var url = base() + "/m/" + token, msg = "Hi! Here is your private link to set today's deal for your Smart QR. Open it, write the offer and tap Show on my page. You can only change the deal.\n" + url;
+      out.innerHTML = "";
+      out.appendChild(h("div", { class: "linkbox", style: "margin-top:12px" }, [h("span", { text: url })]));
+      out.appendChild(h("div", { class: "actions3" }, [
+        h("button", { class: "btn small", type: "button", text: "Copy link", onclick: function () { copy(url, "Manager link copied"); } }),
+        h("a", { class: "btn small", href: "https://wa.me/?text=" + encodeURIComponent(msg), target: "_blank", rel: "noopener", text: "WhatsApp" }),
+        h("button", { class: "btn small", type: "button", text: "New link", onclick: function () {
+          if (window.confirm("Make a new manager link? The old link will stop working and today's deal will be removed.")) request(true);
+        } })
+      ]));
+      if (fresh) toast("New manager link ready");
+    }
+    function request(reset) {
+      btn.disabled = true;
+      fetch("/api/offer?a=link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: adminKey, code: src.code, reset: !!reset }) })
+        .then(function (r) { return r.json().then(function (j) { return { s: r.status, j: j }; }); })
+        .then(function (r) {
+          btn.disabled = false;
+          if (r.s === 200) return show(r.j.token, reset);
+          if (r.s === 503) return toast(r.j.error === "not_configured" ? "The deal store is not set up yet. Finish the setup on Vercel first." : "The deal store is not reachable. Try again.", true);
+          if (r.s === 403) return toast("Please sign in again.", true);
+          toast("Something went wrong. Please try again.", true);
+        }, function () { btn.disabled = false; toast("No connection. Check your internet and try again.", true); });
+    }
+    btn.addEventListener("click", function () { request(false); });
+    return h("div", { class: "card" }, [h("h2", { text: "Today's deal (for the owner)" }),
+      h("p", { class: "muted", style: "margin:0 0 12px", text: "Give the owner a private link. They can only write the red Today's deal box for this QR. Nothing else. The text is not saved in your database and removes itself when its time is over." }),
+      btn, out]);
+  }
+
   function viewLinkEdit(code) {
     current = "linkedit";
     var isNew = !code;
@@ -564,6 +598,7 @@
               h("a", { class: "btn small", href: linkUrl(src.code), target: "_blank", rel: "noopener", text: "Test it" }),
               h("button", { class: "btn small", type: "button", text: "QR code", onclick: function () { openQrUrl({ title: src.label || "/sq/" + src.code, url: linkUrl(src.code), file: "sq-" + src.code }); } })
             ])]),
+          dealCard(src),
           h("div", { class: "card" }, [h("h2", { text: "Numbers" }),
             h("div", { class: "kv" }, [
               h("div", {}, [h("b", { text: String(src.clicks || 0) }), h("span", { text: "Times opened" })]),

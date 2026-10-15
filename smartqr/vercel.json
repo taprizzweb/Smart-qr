@@ -9,6 +9,10 @@
   ],
   "rewrites": [
     {
+      "source": "/m/:t",
+      "destination": "/m.html"
+    },
+    {
       "source": "/sq/:code",
       "destination": "/api/sq?code=:code"
     },

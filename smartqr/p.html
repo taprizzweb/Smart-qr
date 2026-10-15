@@ -60,6 +60,16 @@
     .tile { flex-direction: column; gap: 10px; min-height: 112px; padding: 16px 8px; }
     .tile svg { color: var(--ink); }
     .long { min-height: 84px; padding: 16px 20px; }
+    .deal { position: relative; overflow: hidden; border-radius: 24px; padding: 18px 20px 20px; color: #fff; background: linear-gradient(135deg, #9f1239 0%, #e11d48 58%, #fb7185 130%); border: 1px solid rgba(255, 255, 255, 0.28); box-shadow: 0 14px 34px rgba(190, 18, 60, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
+    .deal .tag { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255, 255, 255, 0.92); }
+    .deal .dot { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: pulse 1.6s ease-in-out infinite; }
+    .deal p { margin: 8px 0 0; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; text-wrap: balance; overflow-wrap: anywhere; }
+    .deal::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 34%; pointer-events: none; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.32), transparent); transform: translateX(-130%) skewX(-18deg); animation: sheen 6s ease-in-out 1.2s infinite; }
+    .get { margin: 10px 0 4px; text-align: center; }
+    .get p { margin: 0 0 8px; font-size: 13px; color: var(--ink-soft); }
+    .dm { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px; border-radius: 999px; background: #fff; border: 1px solid rgba(16, 19, 26, 0.12); color: var(--ink); font-size: 14px; font-weight: 500; text-decoration: none; box-shadow: 0 1px 2px rgba(16, 19, 26, 0.06); transition: transform 180ms cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 220ms ease-out; }
+    .dm:active { transform: scale(0.97); }
+    @media (hover: hover) { .dm:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(16, 19, 26, 0.12); } }
     .zomato { background: #e23744; border-color: #e23744; color: #fff; }
     .zomato:hover { background: #d12e3b; }
     .zomato .zi { width: 30px; height: 30px; border-radius: 9px; background: #fff; color: #e23744; display: grid; place-items: center; font-weight: 700; font-size: 19px; line-height: 1; letter-spacing: -0.04em; }
@@ -124,7 +134,7 @@
     @media (prefers-reduced-motion: reduce) {
       body::before { transition: none; }
       .rv, .pill { opacity: 1; animation: none !important; filter: none; }
-      .skel, .big::after, .game::after, .big .ico, .rip, dialog[open], dialog[open] .sheet { animation: none !important; }
+      .skel, .big::after, .game::after, .deal::after, .deal .dot, .big .ico, .rip, dialog[open], dialog[open] .sheet { animation: none !important; }
       .card, .game { transition: none; }
       .card:hover, .game:hover { transform: none; box-shadow: none; }
     }
@@ -156,6 +166,10 @@
     <main id="page" hidden>
       <header class="hero"><h1 id="shopName"></h1><p id="shopAddr"></p></header>
       <div class="wrap" style="gap:12px">
+        <section class="deal" id="deal" aria-label="Today's deal" hidden>
+          <span class="tag"><i class="dot"></i>Today's deal</span>
+          <p id="dealText"></p>
+        </section>
         <a class="card big" id="reviewLink" data-k="review" target="_blank" rel="noopener">
           <span class="ico" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></span>
           Click for AI Review
@@ -203,6 +217,13 @@
           <img id="logoImg" alt="" hidden>
           <div class="mono" id="logoMono" aria-hidden="true"></div>
         </section>
+        <footer class="get">
+          <p>Want a Smart QR like this for your store?</p>
+          <a class="dm" href="https://www.instagram.com/taprizz.in/" target="_blank" rel="noopener">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="0.7" fill="currentColor"/></svg>
+            DM @taprizz.in
+          </a>
+        </footer>
       </div>
     </main>
   </div>
@@ -262,7 +283,7 @@
       }
       function stagger() {
         var i = 0;
-        Array.prototype.forEach.call(document.querySelectorAll("#page .hero, #page .card, #page .game, #page .logo-card"), function (el) {
+        Array.prototype.forEach.call(document.querySelectorAll("#page .hero, #page .deal, #page .card, #page .game, #page .logo-card, #page .get"), function (el) {
           if (el.offsetParent === null) return;
           el.classList.add("rv"); el.style.setProperty("--i", i++);
         });
@@ -301,6 +322,17 @@
         });
         box.hidden = !box.firstChild;
       }
+
+      // "Today's deal": the owner's short offer for THIS QR (/sq/<code>), fetched from the small deal store. Plain text only.
+      var qCode = (new URLSearchParams(location.search).get("q") || "").toLowerCase();
+      var offerP = /^[a-z0-9-]{3,40}$/.test(qCode) ? fetch("/api/offer?a=get&c=" + encodeURIComponent(qCode)).then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; }) : Promise.resolve({});
+      var dealOn = false;
+      function fitDeal() {
+        var el = $("dealText"); if (!dealOn) return;
+        var size = 30; el.style.fontSize = size + "px";
+        while (size > 15 && el.scrollHeight > size * 1.15 * 4 + 2) { size -= 1; el.style.fontSize = size + "px"; }
+      }
+      window.addEventListener("resize", fitDeal);
 
       function show(s) {
         shop = s;
@@ -347,8 +379,11 @@
         } else {
           $("logoMono").textContent = s.name.split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0); }).join("").toUpperCase();
         }
-        whenReady(function () {
-          $("loading").hidden = true; $("page").hidden = false; stagger(); root.classList.add("ready");
+        var offerGot = Promise.race([offerP, new Promise(function (r) { setTimeout(function () { r({}); }, 1200); })]);
+        Promise.all([offerGot, new Promise(whenReady)]).then(function (r) {
+          var o = r[0] || {};
+          if (typeof o.text === "string" && o.text.trim()) { $("dealText").textContent = o.text.trim().slice(0, 90); $("deal").hidden = false; dealOn = true; }
+          $("loading").hidden = true; $("page").hidden = false; fitDeal(); stagger(); root.classList.add("ready");
           try { localStorage.setItem("sq:c:" + slug, /^#[0-9a-f]{6}$/i.test(s.color || "") ? s.color : "#2563eb"); } catch (e) { /* ignore */ }
         });
         log("view");

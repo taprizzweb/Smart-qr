@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#be123c">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Today's deal</title>
+  <link rel="icon" href="/admin/icons/favicon-32.png" type="image/png">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap">
+  <style>
+    :root { color-scheme: light; --ink: #10131a; --muted: #5b6270; --line: rgba(16,19,26,0.16); --font: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+    [hidden] { display: none !important; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100dvh; background: #f4f5f7; color: var(--ink); font: 400 16px/1.5 var(--font); -webkit-font-smoothing: antialiased; padding: max(16px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom)); }
+    main { max-width: 440px; margin: 0 auto; }
+    h1 { margin: 12px 0 4px; font-size: 28px; line-height: 1.15; font-weight: 600; letter-spacing: -0.025em; }
+    .sub { margin: 0 0 18px; color: var(--muted); font-size: 15px; }
+    .card { background: #fff; border: 1px solid rgba(16,19,26,0.1); border-radius: 20px; padding: 18px; margin-top: 12px; }
+    label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+    textarea, select { width: 100%; font: inherit; font-size: 16px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: #fff; color: var(--ink); }
+    textarea { min-height: 96px; resize: vertical; }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+    .field + .field { margin-top: 14px; }
+    .btn { width: 100%; min-height: 52px; border-radius: 14px; border: 1px solid var(--line); background: #fff; font: 500 16px/1 var(--font); color: var(--ink); cursor: pointer; margin-top: 12px; }
+    .btn.primary { background: #be123c; border-color: #be123c; color: #fff; }
+    .btn:disabled { opacity: 0.55; }
+    .msg { margin: 12px 0 0; font-size: 14px; }
+    .msg.err { color: #b42318; }
+    .msg.ok { color: #1a7f3c; }
+    .h { margin: 0 0 10px; font-size: 12px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+    /* same look as on the shop page */
+    .deal { position: relative; overflow: hidden; border-radius: 24px; padding: 18px 20px 20px; color: #fff; background: linear-gradient(135deg, #9f1239 0%, #e11d48 58%, #fb7185 130%); border: 1px solid rgba(255,255,255,0.28); box-shadow: 0 12px 30px rgba(190,18,60,0.32), inset 0 1px 0 rgba(255,255,255,0.28); }
+    .deal .tag { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.9); }
+    .deal .dot { width: 7px; height: 7px; border-radius: 50%; background: #fff; }
+    .deal p { margin: 8px 0 0; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; text-wrap: balance; overflow-wrap: anywhere; }
+    .state { text-align: center; padding: 80px 8px; }
+  </style>
+</head>
+<body>
+  <main>
+    <div id="bad" class="state" hidden><h1>This link is not valid</h1><p class="sub">Please ask for a new manager link.</p></div>
+    <div id="off" class="state" hidden><h1>Not set up yet</h1><p class="sub">This feature is not switched on yet. Please try again later.</p></div>
+    <div id="app" hidden>
+      <h1>Today's deal</h1>
+      <p class="sub" id="who"></p>
+      <div class="card">
+        <p class="h">Preview</p>
+        <div class="deal"><span class="tag"><i class="dot"></i>Today's deal</span><p id="pv">Your offer shows here</p></div>
+      </div>
+      <div class="card">
+        <div class="field"><label for="text">Your offer</label><textarea id="text" maxlength="90" placeholder="Cold Coffee Rs 99, 4 pm to 7 pm"></textarea><div class="row"><span>Short and clear works best.</span><span id="cnt">0/90</span></div></div>
+        <div class="field"><label for="ttl">Show it</label>
+          <select id="ttl"><option value="today">Until tonight</option><option value="10800">For 3 hours</option><option value="21600">For 6 hours</option><option value="tomorrow">Until tomorrow night</option><option value="week">For 7 days</option></select></div>
+        <button class="btn primary" id="save" type="button">Show on my page</button>
+        <button class="btn" id="clear" type="button">Remove the deal</button>
+        <p class="msg" id="msg" role="status"></p>
+      </div>
+      <p class="sub" style="margin-top:14px;font-size:13px">You can only change this deal. It disappears by itself when the time is over.</p>
+    </div>
+  </main>
+  <script>
+    (function () {
+      "use strict";
+      var $ = function (id) { return document.getElementById(id); };
+      var token = decodeURIComponent(location.pathname.split("/").filter(Boolean).pop() || "");
+      var text = $("text"), msg = $("msg");
+
+      function say(t, ok) { msg.textContent = t; msg.className = "msg " + (ok ? "ok" : "err"); }
+      function fit(el, box, max, min) {
+        var s = max; el.style.fontSize = s + "px";
+        while (s > min && el.scrollHeight > s * 1.15 * 4 + 2) { s -= 1; el.style.fontSize = s + "px"; }
+      }
+      function paint() {
+        var v = text.value.replace(/\s+/g, " ").trim();
+        $("cnt").textContent = text.value.length + "/90";
+        $("pv").textContent = v || "Your offer shows here"; fit($("pv"), null, 30, 15);
+      }
+      function seconds(opt) {
+        var now = Date.now(), ist = new Date(now + 5.5 * 3600 * 1000), y = ist.getUTCFullYear(), m = ist.getUTCMonth(), d = ist.getUTCDate();
+        function night(days) { return Math.floor((Date.UTC(y, m, d + days, 23, 59, 59) - 5.5 * 3600 * 1000 - now) / 1000); }
+        if (opt === "today") return Math.max(600, night(0));
+        if (opt === "tomorrow") return night(1);
+        if (opt === "week") return 7 * 24 * 3600;
+        return Number(opt);
+      }
+      function call(action, body) {
+        return fetch("/api/offer?a=" + action, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+          .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); });
+      }
+      text.addEventListener("input", paint);
+      $("save").addEventListener("click", function () {
+        var v = text.value.replace(/\s+/g, " ").trim();
+        if (v.length < 3) return say("Please write your offer first.", false);
+        var b = this; b.disabled = true; say("Saving...", true);
+        call("set", { t: token, text: v, ttl: seconds($("ttl").value) }).then(function (r) {
+          b.disabled = false;
+          if (r.ok) say("Done. It is live on your page now.", true);
+          else say(r.j.error === "bad_link" ? "This link is no longer valid." : "Could not save. Please try again.", false);
+        }, function () { b.disabled = false; say("No connection. Please try again.", false); });
+      });
+      $("clear").addEventListener("click", function () {
+        var b = this; b.disabled = true; say("Removing...", true);
+        call("clear", { t: token }).then(function (r) {
+          b.disabled = false;
+          if (r.ok) { text.value = ""; paint(); say("Removed. The deal is off your page.", true); } else say("Could not remove. Please try again.", false);
+        }, function () { b.disabled = false; say("No connection. Please try again.", false); });
+      });
+
+      fetch("/api/offer?a=me&t=" + encodeURIComponent(token)).then(function (r) { return r.json().then(function (j) { return { s: r.status, j: j }; }); }).then(function (r) {
+        if (r.s === 503) { $("off").hidden = false; return; }
+        if (r.s !== 200) { $("bad").hidden = false; return; }
+        $("who").textContent = "For QR " + r.j.code + ". Only this deal can be changed here.";
+        text.value = r.j.text || ""; $("app").hidden = false; paint();
+        if (r.j.until) say("Live now. It ends on " + new Date(r.j.until * 1000).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) + ".", true);
+      }, function () { $("bad").hidden = false; });
+    })();
+  </script>
+</body>
+</html>

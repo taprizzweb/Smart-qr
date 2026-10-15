@@ -29,7 +29,7 @@ module.exports = function handler(req, res) {
     clearTimeout(timer);
     var out = t ? JSON.parse(t) : null, to = "";
     if (out && typeof out.target === "string" && /^https:\/\/\S+$/.test(out.target)) to = out.target;
-    else if (out && typeof out.shop === "string" && /^[a-z0-9-]{2,40}$/.test(out.shop)) to = "https://" + String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim() + "/" + out.shop;
+    else if (out && typeof out.shop === "string" && /^[a-z0-9-]{2,40}$/.test(out.shop)) to = (String(req.headers["x-forwarded-proto"] || "https").split(",")[0].trim() === "http" ? "http://" : "https://") + String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim() + "/" + out.shop + "?q=" + code;
     if (!to) return page(res, 404, "Not active yet", "This QR code is not active right now. Please ask the staff.");
     res.statusCode = 307;
     res.setHeader("Location", to);
