@@ -93,6 +93,7 @@
   }
   function errText(e) {
     var m = (e && e.message) || "";
+    if (/Could not find the function|PGRST20[0-9]|schema cache|sq_links/.test(m) || m === "http 404") return "The database is not updated yet. Run the latest schema.sql in Supabase, then try again.";
     if (m === "offline") return "No connection. Check your internet and try again.";
     if (m === "forbidden") return "That admin key is not correct.";
     if (m === "name_required") return "Please enter the shop name.";
