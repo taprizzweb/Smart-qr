@@ -54,6 +54,13 @@
   function linkUrl(code) { return base() + "/sq/" + code; }
   // A QR printed with a temporary *.vercel.app address would stop working once the real domain is used.
   function tempAddress() { return !cfg.base && /\.vercel\.app$/i.test(location.hostname); }
+  // Next free number for printed stands: the highest all-digit code plus one, kept at 3+ digits (001, 002 ...).
+  function nextNumber(links) {
+    var max = 0, width = 3;
+    (links || []).forEach(function (l) { if (/^[0-9]{1,9}$/.test(l.code)) { max = Math.max(max, parseInt(l.code, 10)); width = Math.max(width, l.code.length); } });
+    var n = String(max + 1); while (n.length < width) n = "0" + n;
+    return n;
+  }
   function randomCode() {
     var chars = "abcdefghjkmnpqrstuvwxyz23456789", out = "", a = new Uint32Array(6), i;
     (window.crypto || window.msCrypto).getRandomValues(a);
@@ -101,7 +108,7 @@
     if (/slug_check/.test(m)) return "Page link: use 2 to 40 lowercase letters, numbers or hyphens. Words like admin are reserved.";
     if (/review_url_check/.test(m)) return "The AI review link must start with https://";
     if (/map_url_check/.test(m)) return "The location link must start with https://";
-    if (m === "code_taken") return "This QR code name is already used. Choose another one.";
+    if (m === "code_taken") return "This QR number is already used. Choose another one.";
     if (m === "code_check") return "QR code name: 3 to 40 lowercase letters, numbers or hyphens.";
     if (m === "destination_required") return "Choose where this QR should open.";
     if (m === "link_not_found") return "This QR link no longer exists.";
@@ -411,9 +418,23 @@
       nav("links")
     ]);
     var all = [];
+    function sortKey(l) { return /^[0-9]+$/.test(l.code) ? [0, parseInt(l.code, 10)] : [1, 0]; }
+    function byCode(a, b) { var x = sortKey(a), y = sortKey(b); return x[0] - y[0] || x[1] - y[1] || a.code.localeCompare(b.code); }
+    function destFull(l) { return l.shopSlug ? pageUrl(l.shopSlug) : (l.target || ""); }
+    function csvCell(v) { v = String(v == null ? "" : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+    function downloadCsv() {
+      var rows = [["Number", "QR link", "Business", "Note", "Opens", "Status", "Times opened", "Last opened"]].concat(all.slice().sort(byCode).map(function (l) {
+        return [l.code, linkUrl(l.code), l.shopName || "", l.label || "", destFull(l), l.active ? "Live" : "Paused", l.clicks, l.lastOpened ? l.lastOpened.slice(0, 10) : ""];
+      }));
+      var blob = new Blob(["\ufeff" + rows.map(function (r) { return r.map(csvCell).join(","); }).join("\r\n")], { type: "text/csv" });
+      var a = h("a", { href: URL.createObjectURL(blob), download: "qr-list.csv" }); document.body.appendChild(a); a.click(); a.remove();
+    }
+    var csvBtn = h("button", { class: "btn small", type: "button", text: "Download list (CSV)", onclick: downloadCsv, hidden: true });
+    holder.parentNode.insertBefore(h("div", { style: "margin:8px 0 0" }, [csvBtn]), holder);
     function paint() {
       var q = search.value.trim().toLowerCase();
-      var list = all.filter(function (l) { return !q || (l.code + " " + (l.label || "") + " " + destText(l)).toLowerCase().indexOf(q) > -1; });
+      var list = all.filter(function (l) { return !q || (l.code + " " + (l.label || "") + " " + (l.shopName || "") + " " + destText(l)).toLowerCase().indexOf(q) > -1; }).sort(byCode);
+      csvBtn.hidden = !all.length;
       holder.innerHTML = "";
       if (!all.length) {
         holder.appendChild(h("div", { class: "empty" }, [
@@ -425,10 +446,10 @@
       }
       if (!list.length) { holder.appendChild(h("div", { class: "empty" }, [h("p", { text: "No QR link matches \"" + search.value.trim() + "\"." })])); return; }
       list.forEach(function (l) {
-        var t = h("div", { class: "thumb" }, [icon(ICONS.qr, 24)]); t.style.setProperty("--c", "#10131a"); t.style.setProperty("--on", "#ffffff");
+        var t = h("div", { class: "thumb num", text: l.code }); t.style.setProperty("--c", "#10131a"); t.style.setProperty("--on", "#ffffff");
         holder.appendChild(h("a", { class: "shop", href: "#/link/" + encodeURIComponent(l.code) }, [
           t,
-          h("div", { class: "meta" }, [h("b", { text: l.label || "/sq/" + l.code }), h("span", { text: "/sq/" + l.code + " → " + destText(l) })]),
+          h("div", { class: "meta" }, [h("b", { text: l.shopName || l.label || "Any link" }), h("span", { text: "/sq/" + l.code + (l.shopName && l.label ? " · " + l.label : "") }), h("span", { text: "→ " + destFull(l).replace(/^https?:\/\//, "") })]),
           h("div", { class: "end" }, [h("b", { class: l.active ? "" : "off", text: l.active ? "Live" : "Paused" }), h("span", { text: l.clicks + (l.clicks === 1 ? " open" : " opens") })])
         ]));
       });
@@ -449,12 +470,13 @@
     var top = h("div", { class: "top" }, [h("a", { class: "back", href: "#/links" }, [icon(ICONS.back, 20), "QR links"])]);
     screen([top, h("div", { class: "skeleton" }), h("div", { class: "skeleton" })]);
     var shopsP = guarded(rpc("sq_admin_list", { p_key: adminKey }), function (e) { toast(errText(e), true); });
+    var allLinksP = rpc("sq_admin_links", { p_key: adminKey }).catch(function () { return []; });
     var linkP = isNew ? Promise.resolve({ code: "", label: "", target: "", shopSlug: null, active: true, clicks: 0 }) : guarded(rpc("sq_admin_link_get", { p_key: adminKey, p_code: code }), function (e) {
       screen([top, h("div", { class: "empty" }, [h("p", { text: errText(e) })]), nav("links")]);
     });
-    Promise.all([linkP, shopsP]).then(function (r) { if (r[0] !== FAIL && r[1] !== FAIL) build(r[0], r[1]); });
+    Promise.all([linkP, shopsP, allLinksP]).then(function (r) { if (r[0] !== FAIL && r[1] !== FAIL) build(r[0], r[1], r[2]); });
 
-    function build(src, shops) {
+    function build(src, shops, allLinks) {
       var st = { code: src.code, label: src.label || "", mode: src.shopSlug || (isNew && shops.length) ? "shop" : "url", shopSlug: src.shopSlug || (shops[0] && shops[0].slug) || "", target: src.target || "", active: src.active !== false };
       if (!isNew && !src.shopSlug) st.mode = "url";
       var orig = JSON.stringify(st);
@@ -481,7 +503,11 @@
       mode.addEventListener("change", function () { st.mode = mode.value; paintMode(); touch(); });
       paintMode();
 
-      var gen = isNew ? h("button", { class: "btn small", type: "button", text: "Make a code for me", onclick: function () { st.code = randomCode(); codeIn.value = st.code; touch(); } }) : null;
+      var nextNo = nextNumber(allLinks);
+      var gen = isNew ? h("div", { class: "row", style: "justify-content:flex-start;gap:8px;flex-wrap:wrap" }, [
+        h("button", { class: "btn small", type: "button", text: "Use next number " + nextNo, onclick: function () { st.code = nextNo; codeIn.value = nextNo; touch(); } }),
+        h("button", { class: "btn small", type: "button", text: "Make a random code", onclick: function () { st.code = randomCode(); codeIn.value = st.code; touch(); } })
+      ]) : null;
       var cb = h("input", { type: "checkbox", role: "switch", "aria-label": "QR is active" }); cb.checked = st.active;
       cb.addEventListener("change", function () { st.active = cb.checked; touch(); });
 
@@ -578,16 +604,18 @@
     var isNew = !slug;
     var blank = { slug: "", name: "", address: "", color: "#2563eb", reviewUrl: "", mapUrl: "", whatsapp: "", instagram: "", website: "", zomato: "", buttons: [], gameOn: true, active: true, logo: null, logoThumb: null };
     screen([h("div", { class: "top" }, [h("a", { class: "back", href: "#/shops" }, [icon(ICONS.back, 20), "Shops"])]), h("div", { class: "skeleton" }), h("div", { class: "skeleton" })]);
-    if (isNew) { build(blank); return; }
+    var linksP = rpc("sq_admin_links", { p_key: adminKey }).catch(function () { return []; });
+    if (isNew) { linksP.then(function (l) { build(blank, l); }); return; }
     guarded(rpc("sq_admin_get", { p_key: adminKey, p_slug: slug }), function (e) {
       screen([h("div", { class: "top" }, [h("a", { class: "back", href: "#/shops" }, [icon(ICONS.back, 20), "Shops"])]),
         h("div", { class: "empty" }, [h("p", { text: errText(e) })]), nav("shops")]);
-    }).then(function (s) { if (s !== FAIL) build(s); });
+    }).then(function (s) { if (s !== FAIL) linksP.then(function (l) { build(s, l); }); });
 
-    function build(src) {
+    function build(src, links) {
       var st = JSON.parse(JSON.stringify(src));
       ["address", "reviewUrl", "mapUrl", "whatsapp", "instagram", "website", "zomato"].forEach(function (k) { if (st[k] == null) st[k] = ""; });
       st.buttons = (st.buttons || []).map(function (b) { return { kind: b.kind, label: b.label, value: b.kind === "call" ? waLabel(b.value) : b.value }; });
+      st.qrCode = "";
       st.color = String(st.color || "#2563eb").toLowerCase();
       st.whatsappRaw = st.whatsapp ? waLabel(st.whatsapp) : ""; st.instagramRaw = st.instagram; st.logoChanged = false;
       var orig = JSON.stringify(st), slugTouched = !isNew;
@@ -637,6 +665,14 @@
       });
       var website = bind(h("input", { id: "f-web", type: "url", value: st.website, inputmode: "url", autocomplete: "off", autocapitalize: "none", placeholder: "www.yourshop.com" }), "website");
 
+      var myLinks = (links || []).filter(function (l) { return l.shopSlug === src.slug && !isNew; });
+      var nextNo = nextNumber(links);
+      var qrIn = h("input", { id: "f-qr", type: "text", value: "", maxlength: "40", autocomplete: "off", autocapitalize: "none", spellcheck: "false", placeholder: nextNo });
+      qrIn.addEventListener("input", function () { st.qrCode = qrIn.value.toLowerCase().replace(/[^a-z0-9-]/g, ""); if (qrIn.value !== st.qrCode) qrIn.value = st.qrCode; touch(); });
+      var useNext = h("button", { class: "btn small", type: "button", text: "Use " + nextNo, onclick: function () { st.qrCode = nextNo; qrIn.value = nextNo; touch(); } });
+      var qrList = myLinks.length ? h("div", { class: "chips" }, myLinks.map(function (l) {
+        return h("a", { class: "chip", href: "#/link/" + encodeURIComponent(l.code) }, [l.code, h("small", { text: l.clicks + (l.clicks === 1 ? " open" : " opens") })]);
+      })) : null;
       var zomato = bind(h("input", { id: "f-zomato", type: "url", value: st.zomato, inputmode: "url", autocomplete: "off", autocapitalize: "none", placeholder: "Paste the Zomato restaurant link" }), "zomato");
 
       // extra buttons (owner's own: menu, booking, offer, call, email...)
@@ -738,14 +774,19 @@
           else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(bv)) return err(rowIn[1], "Enter a valid email address.");
           btns.push({ kind: b.kind, label: bl, value: bv });
         }
+        var qrNo = st.qrCode.trim();
+        if (qrNo && !/^[a-z0-9-]{3,40}$/.test(qrNo)) return err(qrIn, "QR number: 3 to 40 letters, numbers or hyphens, like " + nextNo + ".");
         var body = { slug: isNew ? sg : st.slug, name: nm, address: st.address.trim(), color: st.color, reviewUrl: u1.value, mapUrl: u2.value,
           whatsapp: w.value, instagram: i.value, website: wb.value, zomato: zm.value, buttons: btns, gameOn: !!st.gameOn, active: !!st.active };
         if (st.logoChanged) { body.logo = st.logo; body.logoThumb = st.logoThumb; }
+        if (qrNo) body.qrCode = qrNo;
         saveBtn.disabled = true; saveBtn.textContent = "Saving...";
-        guarded(rpc("sq_admin_save", { p_key: adminKey, p_shop: body }), function (e) { toast(errText(e), true); }).then(function (r) {
+        guarded(rpc("sq_admin_save", { p_key: adminKey, p_shop: body }), function (e) {
+          if (qrNo && (e.message === "code_taken" || e.message === "code_check")) err(qrIn, errText(e)); else toast(errText(e), true);
+        }).then(function (r) {
           saveBtn.disabled = false; saveBtn.textContent = isNew ? "Create shop" : "Save changes";
           if (r === FAIL) return;
-          toast(r.created ? "Shop created" : "Saved");
+          toast((r.created ? "Shop created" : "Saved") + (r.qrCode ? ". QR: /sq/" + r.qrCode : ""));
           if (r.created) location.hash = "#/shop/" + encodeURIComponent(r.slug); else viewEdit(st.slug);
         });
       });
@@ -759,6 +800,13 @@
           field("Branch address", "f-address", address),
           field("Page link", "f-slug", h("div", { class: "prefix" }, [h("span", { text: base().replace(/^https?:\/\//, "") + "/" }), slugIn]),
             isNew ? "Printed in the QR code, so choose it once. It cannot be changed later." : "Fixed, because the QR code points here.")]),
+        h("div", { class: "card" }, [h("h2", { text: "QR number" }),
+          qrList,
+          h("div", { class: "field", style: qrList ? "margin-top:12px" : "" }, [
+            h("label", { for: "f-qr", text: myLinks.length ? "Add another QR number (optional)" : "QR number (optional)" }),
+            h("div", { class: "prefix" }, [h("span", { text: base().replace(/^https?:\/\//, "") + "/sq/" }), qrIn]),
+            h("span", { class: "hint", text: "Type a number like " + nextNo + " and this shop's QR becomes " + base().replace(/^https?:\/\//, "") + "/sq/" + nextNo + ". Next free number: " + nextNo + "." }),
+            useNext])]),
         h("div", { class: "card" }, [h("h2", { text: "Look" }),
           h("div", { class: "field" }, [h("span", { class: "lbl", text: "Page colour" }), swWrap, h("span", { class: "hint", text: "The page background fades from this colour." })]),
           h("div", { class: "field" }, [h("span", { class: "lbl", text: "Shop logo" }), h("div", { class: "logo-row" }, [logoThumb, h("div", { class: "acts" }, [addLbl, fileIn, rm])]), logoMsg])]),

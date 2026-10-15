@@ -190,8 +190,11 @@ language plpgsql volatile security definer set search_path = public, pg_catalog 
 declare
   k text := lower(coalesce(p_shop ->> 'slug', '')); s public.sq_shops; created boolean := false;
   nm text := nullif(trim(coalesce(p_shop ->> 'name', '')), '');
+  qr text := lower(nullif(trim(coalesce(p_shop ->> 'qrCode', '')), ''));
 begin
   perform sq_require_admin(p_key);
+  if qr is not null and qr !~ '^[a-z0-9-]{3,40}$' then raise exception 'code_check'; end if;
+  if qr is not null and exists (select 1 from public.sq_links where code = qr) then raise exception 'code_taken'; end if;
   select * into s from public.sq_shops where slug = k;
 
   if not found then
@@ -218,7 +221,13 @@ begin
     updated_at = now()
   where id = s.id;
 
-  return jsonb_build_object('created', created, 'slug', k);
+  -- Optional: give this business a permanent QR number (<domain>/sq/<number>) in the same step.
+  -- If the number is taken, the whole save is cancelled, so a shop is never half-created.
+  if qr is not null then
+    insert into public.sq_links (code, shop_slug) values (qr, k);
+  end if;
+
+  return jsonb_build_object('created', created, 'slug', k, 'qrCode', qr);
 end $$;
 
 create or replace function public.sq_admin_delete(p_key text, p_slug text) returns void
