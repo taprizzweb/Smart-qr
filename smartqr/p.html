@@ -291,20 +291,25 @@
       function log(kind) { if (cfg.url && slug) rpc("sq_log", { p_slug: slug, p_kind: kind }, true).catch(function () {}); }
 
       // Wait (briefly) for the font so text never jumps when it arrives, then reveal everything together.
+      // Decide the logo card look (backdrop or clear) before the page is revealed, so nothing resizes after it appears.
       function fitLogo(src) {
-        var card = document.querySelector(".logo-card"), im = new Image();
-        im.onload = function () {
-          var clear = false;
-          try {
-            var c = document.createElement("canvas"); c.width = c.height = 16;
-            var x = c.getContext("2d"); x.drawImage(im, 0, 0, 16, 16);
-            var p = [[0, 0], [15, 0], [0, 15], [15, 15]];
-            clear = p.filter(function (q) { return x.getImageData(q[0], q[1], 1, 1).data[3] < 200; }).length >= 3;
-          } catch (e) { clear = false; }
-          if (clear) { card.classList.add("clear"); return; }
-          $("logoBg").src = src; $("logoBg").hidden = false; card.classList.add("photo");
-        };
-        im.src = src;
+        return new Promise(function (resolve) {
+          var card = document.querySelector(".logo-card"), im = new Image(), t = setTimeout(resolve, 1500);
+          im.onload = function () {
+            var clear = false;
+            try {
+              var c = document.createElement("canvas"); c.width = c.height = 16;
+              var x = c.getContext("2d"); x.drawImage(im, 0, 0, 16, 16);
+              var p = [[0, 0], [15, 0], [0, 15], [15, 15]];
+              clear = p.filter(function (q) { return x.getImageData(q[0], q[1], 1, 1).data[3] < 200; }).length >= 3;
+            } catch (e) { clear = false; }
+            if (clear) { card.classList.add("clear"); }
+            else { $("logoBg").src = src; $("logoBg").hidden = false; card.classList.add("photo"); }
+            clearTimeout(t); resolve();
+          };
+          im.onerror = function () { clearTimeout(t); resolve(); };
+          im.src = src;
+        });
       }
       function whenReady(cb) {
         var done = false; function go() { if (!done) { done = true; cb(); } }
@@ -404,14 +409,15 @@
 
         $("playBtn").hidden = !s.gameOn;
 
+        var logoP = Promise.resolve();
         if (/^data:image\/(png|jpeg|webp);base64,/.test(s.logo || "")) {
           $("logoImg").src = s.logo; $("logoImg").alt = s.name + " logo"; $("logoImg").hidden = false; $("logoMono").hidden = true;
-          fitLogo(s.logo);
+          logoP = fitLogo(s.logo);
         } else {
           $("logoMono").textContent = s.name.split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0); }).join("").toUpperCase();
         }
         var offerGot = Promise.race([offerP, new Promise(function (r) { setTimeout(function () { r({}); }, 1200); })]);
-        Promise.all([offerGot, new Promise(whenReady)]).then(function (r) {
+        Promise.all([offerGot, new Promise(whenReady), logoP]).then(function (r) {
           var o = r[0] || {};
           if (typeof o.text === "string" && o.text.trim()) { $("dealText").textContent = o.text.trim().slice(0, 90); $("deal").hidden = false; dealOn = true; }
           if (typeof o.note === "string" && o.note.trim()) { $("infoText").textContent = o.note.trim().slice(0, 200); $("info").hidden = false; }
