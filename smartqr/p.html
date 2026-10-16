@@ -113,7 +113,7 @@
     @media (prefers-reduced-motion: reduce) { .wheel canvas { transition-duration: 0.01s; } .card, .game { transition: none; } }
 
     /* ---------- premium motion: staggered rise-in, press feedback, ripple, soft sheen ---------- */
-    @keyframes rise { from { opacity: 0; transform: translateY(16px) scale(0.985); filter: blur(5px); } to { opacity: 1; transform: none; filter: blur(0); } }
+    @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
     @keyframes dropIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
     @keyframes sheen { 0%, 62% { transform: translateX(-130%) skewX(-18deg); } 100% { transform: translateX(260%) skewX(-18deg); } }
     @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
@@ -122,11 +122,11 @@
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 
-    .skel { animation: pulse 1.4s ease-in-out infinite; }
+    .skel { visibility: hidden; }
     .pill { opacity: 0; }
     html.ready .pill, html.known .pill { animation: dropIn 600ms cubic-bezier(0.2, 0.7, 0.2, 1) 60ms both; }
     .rv { opacity: 0; }
-    html.ready .rv { animation: rise 650ms cubic-bezier(0.2, 0.7, 0.2, 1) calc(120ms + var(--i, 0) * 70ms) both; }
+    html.ready .rv { animation: rise 650ms cubic-bezier(0.2, 0.7, 0.2, 1) calc(40ms + var(--i, 0) * 60ms) both; }
 
     .card, .game { position: relative; overflow: hidden; -webkit-user-select: none; user-select: none; transition: background-color 150ms ease-out, transform 180ms cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 220ms ease-out; will-change: transform; }
     @media (hover: hover) {
