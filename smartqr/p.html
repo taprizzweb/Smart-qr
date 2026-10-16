@@ -81,6 +81,12 @@
     .game:hover { opacity: 0.92; }
     .logo-card { margin-top: 6px; background: var(--glass); border: 1px solid var(--glass-edge); border-radius: 24px; box-shadow: 0 1px 2px rgba(16, 19, 26, 0.06); min-height: 168px; display: grid; place-items: center; padding: 24px; }
     .logo-card img { max-width: 72%; max-height: 120px; object-fit: contain; display: block; }
+    .logo-card.photo { position: relative; overflow: hidden; isolation: isolate; border: 0; min-height: 250px; padding: 32px; box-shadow: 0 10px 30px rgba(16, 19, 26, 0.12); }
+    .logo-card.photo .logo-bg { position: absolute; left: -40px; top: -40px; width: calc(100% + 80px); height: calc(100% + 80px); max-width: none; max-height: none; object-fit: cover; filter: blur(34px) saturate(1.2); transform: scale(1.15); z-index: -1; }
+    .logo-card.photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(0, 0, 0, 0.14)); z-index: -1; pointer-events: none; }
+    .logo-card.photo #logoImg { max-width: 66%; max-height: 190px; border-radius: 22px; box-shadow: 0 22px 44px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2); }
+    .logo-card.clear { min-height: 230px; }
+    .logo-card.clear #logoImg { max-width: 62%; max-height: 150px; }
     .mono { width: 96px; height: 96px; border-radius: 28px; background: var(--c); color: var(--on-hero); display: grid; place-items: center; font-size: 36px; font-weight: 600; letter-spacing: -0.02em; }
 
     .state { padding: 90px 4px 20px; text-align: center; color: var(--on-hero); }
@@ -222,6 +228,7 @@
           Play a quick game
         </button>
         <section class="logo-card" aria-label="Shop logo">
+          <img class="logo-bg" id="logoBg" alt="" aria-hidden="true" hidden>
           <img id="logoImg" alt="" hidden>
           <div class="mono" id="logoMono" aria-hidden="true"></div>
         </section>
@@ -284,6 +291,21 @@
       function log(kind) { if (cfg.url && slug) rpc("sq_log", { p_slug: slug, p_kind: kind }, true).catch(function () {}); }
 
       // Wait (briefly) for the font so text never jumps when it arrives, then reveal everything together.
+      function fitLogo(src) {
+        var card = document.querySelector(".logo-card"), im = new Image();
+        im.onload = function () {
+          var clear = false;
+          try {
+            var c = document.createElement("canvas"); c.width = c.height = 16;
+            var x = c.getContext("2d"); x.drawImage(im, 0, 0, 16, 16);
+            var p = [[0, 0], [15, 0], [0, 15], [15, 15]];
+            clear = p.filter(function (q) { return x.getImageData(q[0], q[1], 1, 1).data[3] < 200; }).length >= 3;
+          } catch (e) { clear = false; }
+          if (clear) { card.classList.add("clear"); return; }
+          $("logoBg").src = src; $("logoBg").hidden = false; card.classList.add("photo");
+        };
+        im.src = src;
+      }
       function whenReady(cb) {
         var done = false; function go() { if (!done) { done = true; cb(); } }
         try { Promise.race([document.fonts.load('500 16px "Plus Jakarta Sans"'), new Promise(function (r) { setTimeout(r, 900); })]).then(go, go); } catch (e) { go(); }
@@ -384,6 +406,7 @@
 
         if (/^data:image\/(png|jpeg|webp);base64,/.test(s.logo || "")) {
           $("logoImg").src = s.logo; $("logoImg").alt = s.name + " logo"; $("logoImg").hidden = false; $("logoMono").hidden = true;
+          fitLogo(s.logo);
         } else {
           $("logoMono").textContent = s.name.split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0); }).join("").toUpperCase();
         }
