@@ -1,7 +1,7 @@
 // /vcard/<shop>  ->  a .vcf contact card for the shop. Opening it lets the visitor save the contact in one tap.
 // Built from the shop's public page data only (name, phone, website, address). Nothing about the visitor is stored.
-var SUPABASE_URL = process.env.SQ_SUPABASE_URL || "https://pjophsiodkctmyyfkpnm.supabase.co";
-var SUPABASE_KEY = process.env.SQ_SUPABASE_KEY || "sb_publishable_d55Z9QXsWQ7SStVMNpAIfw_kme_frrL";
+var SUPABASE_URL = process.env.SQ_SUPABASE_URL || "https://khthtasavgtpqhesvavc.supabase.co";
+var SUPABASE_KEY = process.env.SQ_SUPABASE_KEY || "sb_publishable_noWmUI3q27X9DotwveN1aQ_Ku5tFfGr";
 
 function esc(v) { return String(v == null ? "" : v).replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/;/g, "\\;").replace(/,/g, "\\,"); }
 

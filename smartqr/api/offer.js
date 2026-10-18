@@ -8,8 +8,8 @@
 // Needs two settings on Vercel: the Redis store (UPSTASH_REDIS_REST_URL / _TOKEN, added by the Upstash integration)
 // and SQ_MANAGER_SECRET (any long random text). Without them the page simply shows no deal.
 var crypto = require("crypto");
-var SUPABASE_URL = process.env.SQ_SUPABASE_URL || "https://pjophsiodkctmyyfkpnm.supabase.co";
-var SUPABASE_KEY = process.env.SQ_SUPABASE_KEY || "sb_publishable_d55Z9QXsWQ7SStVMNpAIfw_kme_frrL";
+var SUPABASE_URL = process.env.SQ_SUPABASE_URL || "https://khthtasavgtpqhesvavc.supabase.co";
+var SUPABASE_KEY = process.env.SQ_SUPABASE_KEY || "sb_publishable_noWmUI3q27X9DotwveN1aQ_Ku5tFfGr";
 var MAX_TEXT = 90, MAX_NOTE = 200, MIN_TTL = 600, MAX_TTL = 7 * 24 * 3600;
 var KEYS = { deal: "sq:offer:", note: "sq:note:" };
 function kindOf(v) { return v === "note" ? "note" : "deal"; }

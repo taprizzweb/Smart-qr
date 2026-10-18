@@ -1,8 +1,8 @@
 // /sq/<code>  ->  307 redirect to wherever the owner pointed that code (changeable any time from the admin).
 // The printed QR only ever contains /sq/<code>, so it never needs reprinting. Nothing about the visitor is stored.
 // The URL and key below are the public ones (same as config.js); SQ_SUPABASE_URL / SQ_SUPABASE_KEY can override them.
-var SUPABASE_URL = process.env.SQ_SUPABASE_URL || "https://pjophsiodkctmyyfkpnm.supabase.co";
-var SUPABASE_KEY = process.env.SQ_SUPABASE_KEY || "sb_publishable_d55Z9QXsWQ7SStVMNpAIfw_kme_frrL";
+var SUPABASE_URL = process.env.SQ_SUPABASE_URL || "https://khthtasavgtpqhesvavc.supabase.co";
+var SUPABASE_KEY = process.env.SQ_SUPABASE_KEY || "sb_publishable_noWmUI3q27X9DotwveN1aQ_Ku5tFfGr";
 
 function page(res, status, title, text) {
   res.statusCode = status;
