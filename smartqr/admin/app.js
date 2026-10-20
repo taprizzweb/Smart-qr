@@ -644,12 +644,19 @@
     });
   }
 
-  function viewEdit(slug) {
+  function viewEdit(slug, dupOf) {
     current = "edit";
     var isNew = !slug;
     var blank = { slug: "", name: "", address: "", color: "#2563eb", reviewUrl: "", mapUrl: "", whatsapp: "", instagram: "", website: "", zomato: "", menuUrl: "", facebook: "", saveContact: false, contactPhone: "", buttons: [], gameOn: true, active: true, logo: null, logoThumb: null };
     screen([h("div", { class: "top" }, [h("a", { class: "back", href: "#/shops" }, [icon(ICONS.back, 20), "Shops"])]), h("div", { class: "skeleton" }), h("div", { class: "skeleton" })]);
     var linksP = rpc("sq_admin_links", { p_key: adminKey }).catch(function () { return []; });
+    if (isNew && dupOf) {
+      guarded(rpc("sq_admin_get", { p_key: adminKey, p_slug: dupOf }), function (e) {
+        screen([h("div", { class: "top" }, [h("a", { class: "back", href: "#/shops" }, [icon(ICONS.back, 20), "Shops"])]),
+          h("div", { class: "empty" }, [h("p", { text: errText(e) })]), nav("shops")]);
+      }).then(function (s) { if (s !== FAIL) linksP.then(function (l) { build(s, l); }); });
+      return;
+    }
     if (isNew) { linksP.then(function (l) { build(blank, l); }); return; }
     guarded(rpc("sq_admin_get", { p_key: adminKey, p_slug: slug }), function (e) {
       screen([h("div", { class: "top" }, [h("a", { class: "back", href: "#/shops" }, [icon(ICONS.back, 20), "Shops"])]),
@@ -663,6 +670,15 @@
       st.qrCode = ""; st.contactPhoneRaw = st.contactPhone ? waLabel(st.contactPhone) : "";
       st.color = String(st.color || "#2563eb").toLowerCase();
       st.whatsappRaw = st.whatsapp ? waLabel(st.whatsapp) : ""; st.instagramRaw = st.instagram; st.logoChanged = false;
+      if (dupOf) {
+        // Duplicate: everything is copied except the page link and the QR number, which must be new.
+        st.slug = slugify(st.name + " 2").slice(0, 40); st.logoChanged = !!st.logo; st.logoThumb = null;
+        if (st.logo) {
+          var tim = new Image();
+          tim.onload = function () { var t = encode(tim, 96, 0.8); if (t.length <= 19000) st.logoThumb = t; };
+          tim.src = st.logo;
+        }
+      }
       var orig = JSON.stringify(st), slugTouched = !isNew;
 
       // preview
@@ -837,19 +853,26 @@
         if (st.logoChanged) { body.logo = st.logo; body.logoThumb = st.logoThumb; }
         if (qrNo) body.qrCode = qrNo;
         saveBtn.disabled = true; saveBtn.textContent = "Saving...";
-        guarded(rpc("sq_admin_save", { p_key: adminKey, p_shop: body }), function (e) {
-          if (qrNo && (e.message === "code_taken" || e.message === "code_check")) err(qrIn, errText(e)); else toast(errText(e), true);
-        }).then(function (r) {
-          saveBtn.disabled = false; saveBtn.textContent = isNew ? "Create shop" : "Save changes";
-          if (r === FAIL) return;
-          toast((r.created ? "Shop created" : "Saved") + (r.qrCode ? ". QR: /sq/" + r.qrCode : ""));
-          if (r.created) location.hash = "#/shop/" + encodeURIComponent(r.slug); else viewEdit(st.slug);
-        });
+        function resetBtn() { saveBtn.disabled = false; saveBtn.textContent = isNew ? "Create shop" : "Save changes"; }
+        // A new shop must never overwrite an existing one that has the same page link.
+        var takenP = isNew ? rpc("sq_admin_get", { p_key: adminKey, p_slug: sg }).then(function () { return true; }, function (e) {
+          if (e && e.message === "shop_not_found") return false; throw e; }) : Promise.resolve(false);
+        takenP.then(function (taken) {
+          if (taken) { resetBtn(); return err(slugIn, "This page link is already used by another shop. Choose a different one."); }
+          return guarded(rpc("sq_admin_save", { p_key: adminKey, p_shop: body }), function (e) {
+            if (qrNo && (e.message === "code_taken" || e.message === "code_check")) err(qrIn, errText(e)); else toast(errText(e), true);
+          }).then(function (r) {
+            resetBtn();
+            if (r === FAIL) return;
+            toast((r.created ? "Shop created" : "Saved") + (r.qrCode ? ". QR: /sq/" + r.qrCode : ""));
+            if (r.created) location.hash = "#/shop/" + encodeURIComponent(r.slug); else viewEdit(st.slug);
+          });
+        }, function (e) { resetBtn(); toast(errText(e), true); });
       });
 
       var kids = [
         h("div", { class: "top" }, [h("a", { class: "back", href: "#/shops" }, [icon(ICONS.back, 20), "Shops"])]),
-        h("div", { class: "top", style: "min-height:0;margin-bottom:8px" }, [h("h1", { text: isNew ? "New shop" : (src.name || "Shop") })]),
+        h("div", { class: "top", style: "min-height:0;margin-bottom:8px" }, [h("h1", { text: isNew ? (dupOf ? "Duplicate shop" : "New shop") : (src.name || "Shop") })]),
         pv,
         h("div", { class: "card" }, [h("h2", { text: "Shop" }),
           field("Shop name", "f-name", name),
@@ -921,6 +944,9 @@
               h("button", { class: "btn small", type: "button", text: "QR code", onclick: function () { openQr(src); } })
             ])]),
           h("div", { class: "card" }, [h("div", { class: "row", style: "margin-bottom:12px" }, [h("h2", { style: "margin:0", text: "Numbers" }), h("div", { class: "field", style: "margin:0;width:150px" }, [range])]), statsBox]),
+          h("div", { class: "card" }, [h("h2", { text: "Duplicate" }),
+            h("p", { class: "muted", style: "margin:0 0 12px", text: "Make a new shop with the same colour, buttons and logo. You choose the new name, page link and QR number." }),
+            h("a", { class: "btn", href: "#/duplicate/" + encodeURIComponent(src.slug), text: "Duplicate this shop" })]),
           h("div", { class: "card" }, [h("h2", { text: "Delete" }),
             h("p", { class: "muted", style: "margin:0 0 12px", text: "Removes the page and its numbers. A printed QR code will stop working." }),
             h("button", { class: "btn danger", type: "button", text: "Delete this shop...", onclick: function () { showDelete(delWrap, src); } }), delWrap])
@@ -928,6 +954,7 @@
         setTimeout(loadStats, 0);
       }
 
+      if (dupOf) kids.splice(2, 0, h("p", { class: "muted", style: "margin:0 0 12px", text: "Copied from " + (src.name || dupOf) + ". Give it a new name and page link, then check the review, location, WhatsApp and Instagram links." }));
       kids.push(h("div", { class: "bar" }, [h("div", {}, [h("a", { class: "btn", href: "#/shops", text: "Cancel" }), saveBtn, dirty])]));
       screen(kids, { bar: true });
       paintPreview(); paintSw(); paintLogo(); paintButtons();
@@ -1006,6 +1033,7 @@
     if (!adminKey) return viewLogin();
     var p = (location.hash || "#/").slice(1).split("/").filter(Boolean);
     if (p[0] === "new") return viewEdit(null);
+    if (p[0] === "duplicate" && p[1]) return viewEdit(null, decodeURIComponent(p[1]));
     if (p[0] === "shop" && p[1]) return viewEdit(decodeURIComponent(p[1]));
     if (p[0] === "settings") return viewSettings();
     if (p[0] === "shops") return viewList();
