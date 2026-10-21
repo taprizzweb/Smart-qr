@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f766e" id="themeColor">
+  <meta name="robots" content="noindex">
+  <title>The Story of Jaipur</title>
+  <link rel="icon" href="/admin/icons/favicon-32.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
+  <style>
+    :root {
+      color-scheme: light;
+      --c: #0f766e; --ink: #10131a; --soft: #4b5262; --line: rgba(16, 19, 26, 0.12);
+      --wa: #1faa59; --wa-dark: #178a47;
+      --font: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    [hidden] { display: none !important; }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0; min-height: 100vh; min-height: 100dvh; font: 400 16px/1.5 var(--font); color: var(--ink);
+      -webkit-font-smoothing: antialiased; background: #f6f1e9;
+      background-image: linear-gradient(180deg, color-mix(in srgb, var(--c) 88%, #000) 0, color-mix(in srgb, var(--c) 55%, #fff) 230px, #f6f1e9 470px);
+      background-repeat: no-repeat;
+      padding: max(18px, env(safe-area-inset-top, 0px)) 16px max(32px, env(safe-area-inset-bottom, 0px));
+    }
+    .wrap { max-width: 440px; margin: 0 auto; }
+    .hero { color: #fff; padding: 22px 4px 18px; }
+    .eyebrow { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.85; overflow-wrap: anywhere; }
+    h1 { margin: 8px 0 0; font-size: 34px; line-height: 1.1; font-weight: 700; letter-spacing: -0.03em; text-wrap: balance; }
+    .sub { margin: 10px 0 0; font-size: 15px; line-height: 1.45; opacity: 0.9; }
+    .card { background: rgba(255, 255, 255, 0.94); border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 24px; padding: 20px 18px; box-shadow: 0 10px 34px rgba(16, 19, 26, 0.12); }
+    .step { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--soft); }
+    .step b { color: var(--c); font-weight: 700; margin-right: 4px; }
+    .block { margin-top: 20px; }
+    .block:first-child { margin-top: 0; }
+    input[type=text] {
+      width: 100%; min-height: 50px; padding: 0 16px; font: 500 16px var(--font); color: var(--ink); background: #fff;
+      border: 1.5px solid var(--line); border-radius: 14px; outline: none; transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+    }
+    input[type=text]:focus { border-color: var(--c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 22%, transparent); }
+    .days { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; margin: 0 -2px; scrollbar-width: none; scroll-snap-type: x proximity; }
+    .days::-webkit-scrollbar { display: none; }
+    .chip {
+      flex: none; min-width: 78px; padding: 9px 10px; font: 600 13px/1.25 var(--font); color: var(--ink); text-align: center; background: #fff;
+      border: 1.5px solid var(--line); border-radius: 14px; cursor: pointer; scroll-snap-align: start;
+      transition: background-color 150ms ease-out, border-color 150ms ease-out, color 150ms ease-out, transform 120ms ease-out;
+    }
+    .chip small { display: block; font-size: 11px; font-weight: 500; color: var(--soft); }
+    .chip:active { transform: scale(0.97); }
+    .chip[aria-pressed="true"] { background: var(--c); border-color: var(--c); color: #fff; }
+    .chip[aria-pressed="true"] small { color: rgba(255, 255, 255, 0.85); }
+    .slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .slot { min-height: 46px; padding: 0 6px; font: 600 14px var(--font); }
+    .slot[disabled] { opacity: 0.38; cursor: not-allowed; background: #f1f1f1; text-decoration: line-through; }
+    .none { margin: 0; padding: 14px; text-align: center; font-size: 14px; color: var(--soft); background: #f6f6f6; border-radius: 14px; }
+    .guests { display: flex; align-items: center; gap: 12px; }
+    .guests button {
+      width: 44px; height: 44px; font: 600 22px/1 var(--font); color: var(--ink); background: #fff; border: 1.5px solid var(--line); border-radius: 50%; cursor: pointer;
+    }
+    .guests button:active { transform: scale(0.95); }
+    .guests output { min-width: 32px; text-align: center; font-size: 20px; font-weight: 700; }
+    .sum { margin: 20px 0 0; padding: 12px 14px; font-size: 14px; line-height: 1.4; color: var(--ink); background: color-mix(in srgb, var(--c) 9%, #fff); border-radius: 14px; }
+    .go {
+      display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 56px; margin-top: 14px; padding: 0 18px;
+      font: 700 17px var(--font); color: #fff; background: var(--wa); border: 0; border-radius: 18px; cursor: pointer; text-decoration: none;
+      box-shadow: 0 8px 20px rgba(31, 170, 89, 0.32); transition: background-color 150ms ease-out, transform 120ms ease-out, opacity 150ms ease-out;
+    }
+    .go:hover { background: var(--wa-dark); }
+    .go:active { transform: scale(0.98); }
+    .go[aria-disabled="true"] { opacity: 0.45; box-shadow: none; cursor: not-allowed; }
+    .go svg { width: 24px; height: 24px; fill: currentColor; }
+    .err { margin: 8px 0 0; font-size: 13px; color: #b42318; }
+    .note { margin: 12px 4px 0; font-size: 12.5px; line-height: 1.45; text-align: center; color: var(--soft); }
+    .foot { margin-top: 22px; text-align: center; font-size: 12px; color: var(--soft); }
+    .foot a { color: inherit; }
+    a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+    @media (prefers-reduced-motion: no-preference) {
+      .hero, .card { animation: rise 600ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+      .card { animation-delay: 90ms; }
+      @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="hero">
+      <p class="eyebrow" id="shopName">Jaipur Vistas Cafe</p>
+      <h1>The Story of Jaipur</h1>
+      <p class="sub">Hear it from our owner, in person. Pick the time that suits you and send us a request on WhatsApp.</p>
+    </header>
+
+    <section class="card" aria-label="Book your story time">
+      <div class="block">
+        <p class="step"><b>1</b>Your name</p>
+        <input id="name" type="text" maxlength="40" autocomplete="name" autocapitalize="words" placeholder="Your name" aria-label="Your name">
+      </div>
+
+      <div class="block">
+        <p class="step"><b>2</b>Pick a day</p>
+        <div class="days" id="days" role="group" aria-label="Day"></div>
+      </div>
+
+      <div class="block">
+        <p class="step"><b>3</b>Pick a time</p>
+        <div class="slots" id="slots" role="group" aria-label="Time"></div>
+        <p class="none" id="none" hidden>No time left on this day. Please pick another day.</p>
+      </div>
+
+      <div class="block">
+        <p class="step"><b>4</b>How many people?</p>
+        <div class="guests">
+          <button type="button" id="minus" aria-label="Fewer people">&minus;</button>
+          <output id="count" aria-live="polite">2</output>
+          <button type="button" id="plus" aria-label="More people">+</button>
+        </div>
+      </div>
+
+      <p class="sum" id="sum">Add your name and pick a day and time.</p>
+      <a class="go" id="go" href="#" role="button" aria-disabled="true" rel="noopener">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 1.8a8.2 8.2 0 1 1-4.2 15.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 0 1 12 3.8Zm-3 4.1c-.2 0-.5.1-.7.4-.2.3-.9.9-.9 2.2 0 1.3.9 2.5 1 2.7.2.2 1.8 2.9 4.5 3.9 2.2.9 2.7.7 3.2.7.5-.1 1.6-.7 1.8-1.3.2-.6.2-1.2.2-1.3-.1-.1-.2-.2-.5-.3l-1.7-.8c-.2-.1-.4-.1-.6.1-.2.3-.7.9-.8 1-.2.2-.3.2-.6.1-.3-.1-1.1-.4-2.1-1.3-.8-.7-1.3-1.5-1.4-1.8-.2-.3 0-.4.1-.5l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-.8-1.9c-.2-.5-.4-.4-.6-.4Z"/></svg>
+        <span>Send on WhatsApp</span>
+      </a>
+      <p class="err" id="err" role="alert" hidden></p>
+      <p class="note">This sends a request message. Our owner will confirm the time with you on WhatsApp.</p>
+    </section>
+
+    <p class="foot">Powered by <a href="https://www.taprizz.in" target="_blank" rel="noopener">Taprizz</a></p>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+      // ----- Settings for this business. Everything can also be set in the link, for example:
+      //   /story/?to=919928391150&shop=Jaipur%20Vistas%20Cafe&from=10:00&till=21:00&every=30&days=7&c=0f766e
+      var CFG = { to: "919928391150", shop: "Jaipur Vistas Cafe", from: "10:00", till: "21:00", every: 30, days: 7, lead: 30, color: "0f766e", tz: "Asia/Kolkata" };
+
+      var q = new URLSearchParams(location.search);
+      function clock(v, fb) { var m = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(String(v || "")); return m ? (+m[1]) * 60 + (+m[2]) : fb; }
+      var to = String(q.get("to") || CFG.to).replace(/\D/g, "");
+      if (!/^[0-9]{8,15}$/.test(to)) to = CFG.to;
+      var shop = String(q.get("shop") || CFG.shop).replace(/[\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60) || CFG.shop;
+      var fromMin = clock(q.get("from"), clock(CFG.from, 600)), tillMin = clock(q.get("till"), clock(CFG.till, 1260));
+      var every = Math.min(240, Math.max(15, parseInt(q.get("every"), 10) || CFG.every));
+      var dayCount = Math.min(14, Math.max(1, parseInt(q.get("days"), 10) || CFG.days));
+      var lead = CFG.lead;
+      var color = /^[0-9a-f]{6}$/i.test(q.get("c") || "") ? q.get("c") : CFG.color;
+      if (tillMin < fromMin) { var sw = fromMin; fromMin = tillMin; tillMin = sw; }
+      document.documentElement.style.setProperty("--c", "#" + color);
+      document.getElementById("themeColor").setAttribute("content", "#" + color);
+      document.getElementById("shopName").textContent = shop;
+
+      var $ = function (id) { return document.getElementById(id); };
+      var st = { name: "", day: null, slot: null, guests: 2 };
+
+      // "Now" in Indian time, whatever the phone's own time zone is.
+      function istNow() {
+        var p = {}; new Intl.DateTimeFormat("en-GB", { timeZone: CFG.tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+          .formatToParts(new Date()).forEach(function (x) { p[x.type] = x.value; });
+        return { y: +p.year, m: +p.month, d: +p.day, min: (+p.hour) * 60 + (+p.minute) };
+      }
+      function dayLabel(utc) { return new Intl.DateTimeFormat("en-IN", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short" }).format(utc); }
+      function fmtTime(min) {
+        var h = Math.floor(min / 60), m = min % 60, ap = h >= 12 ? "PM" : "AM", h12 = h % 12 || 12;
+        return h12 + ":" + (m < 10 ? "0" : "") + m + " " + ap;
+      }
+
+      var now = istNow(), days = [];
+      for (var i = 0; i < dayCount; i++) {
+        var u = new Date(Date.UTC(now.y, now.m - 1, now.d + i));
+        days.push({ utc: u, label: dayLabel(u), top: i === 0 ? "Today" : i === 1 ? "Tomorrow" : new Intl.DateTimeFormat("en-IN", { timeZone: "UTC", weekday: "short" }).format(u), idx: i });
+      }
+      function slotsFor(day) {
+        var out = [], t;
+        for (t = fromMin; t <= tillMin; t += every) out.push({ min: t, ok: day.idx > 0 || t >= now.min + lead });
+        return out;
+      }
+
+      function paintDays() {
+        var box = $("days"); box.innerHTML = "";
+        days.forEach(function (d) {
+          var b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.setAttribute("aria-pressed", String(st.day === d));
+          b.appendChild(document.createTextNode(d.top)); var s = document.createElement("small"); s.textContent = d.label.replace(/^[A-Za-z]+,?\s*/, ""); b.appendChild(s);
+          b.addEventListener("click", function () { st.day = d; if (st.slot && !slotsFor(d).some(function (x) { return x.min === st.slot && x.ok; })) st.slot = null; paintDays(); paintSlots(); paint(); });
+          box.appendChild(b);
+        });
+      }
+      function paintSlots() {
+        var box = $("slots"); box.innerHTML = ""; var list = st.day ? slotsFor(st.day) : [], any = false;
+        list.forEach(function (sl) {
+          var b = document.createElement("button"); b.type = "button"; b.className = "chip slot"; b.textContent = fmtTime(sl.min);
+          b.setAttribute("aria-pressed", String(st.slot === sl.min)); if (!sl.ok) b.disabled = true; else any = true;
+          b.addEventListener("click", function () { st.slot = sl.min; paintSlots(); paint(); });
+          box.appendChild(b);
+        });
+        $("none").hidden = any || !st.day; box.hidden = !any && !!st.day;
+      }
+
+      function cleanName() { return st.name.replace(/[\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 40); }
+      function ready() { return cleanName().length >= 2 && st.day && st.slot != null; }
+      function message() {
+        return "Hello! My name is " + cleanName() + ". I would like to hear the Story of Jaipur from you at " + shop + " on " + st.day.label + " at " + fmtTime(st.slot) +
+          ". We will be " + st.guests + (st.guests === 1 ? " person" : " people") + ". Please confirm if this time works. Thank you!";
+      }
+      function paint() {
+        var go = $("go"), ok = ready();
+        $("count").textContent = String(st.guests);
+        $("sum").textContent = ok ? cleanName() + ", " + st.day.label + " at " + fmtTime(st.slot) + ", " + st.guests + (st.guests === 1 ? " person" : " people")
+          : "Add your name and pick a day and time.";
+        go.setAttribute("aria-disabled", String(!ok));
+        go.setAttribute("href", ok ? "https://wa.me/" + to + "?text=" + encodeURIComponent(message()) : "#");
+        if (ok) { go.setAttribute("target", "_blank"); $("err").hidden = true; } else go.removeAttribute("target");
+      }
+
+      $("name").addEventListener("input", function (e) { st.name = e.target.value; paint(); });
+      $("minus").addEventListener("click", function () { st.guests = Math.max(1, st.guests - 1); paint(); });
+      $("plus").addEventListener("click", function () { st.guests = Math.min(20, st.guests + 1); paint(); });
+      $("go").addEventListener("click", function (e) {
+        if (ready()) return;
+        e.preventDefault();
+        var m = cleanName().length < 2 ? "Please enter your name." : !st.day ? "Please pick a day." : "Please pick a time.";
+        $("err").textContent = m; $("err").hidden = false;
+        if (cleanName().length < 2) $("name").focus();
+      });
+
+      // Start on today, or on tomorrow when today's slots are over.
+      st.day = days.filter(function (d) { return slotsFor(d).some(function (x) { return x.ok; }); })[0] || days[0];
+      paintDays(); paintSlots(); paint();
+    })();
+  </script>
+</body>
+</html>

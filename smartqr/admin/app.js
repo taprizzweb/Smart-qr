@@ -5,7 +5,7 @@
   var app = document.getElementById("app");
   var KEY = "sq:adminKey", NUDGE = "sq:installNudge";
   var COLORS = ["#2563eb", "#0e9f8e", "#16a34a", "#f59e0b", "#e11d48", "#7c3aed", "#ea580c", "#0f172a"];
-  var RESERVED = ["admin", "assets", "vendor", "icons", "api", "config", "p", "sw", "sq"];
+  var RESERVED = ["admin", "assets", "vendor", "icons", "api", "config", "p", "sw", "sq", "story"];
   var adminKey = null, deferredInstall = null, current = "";
 
   try { adminKey = localStorage.getItem(KEY) || null; } catch (e) { /* storage blocked */ }
