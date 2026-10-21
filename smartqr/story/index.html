@@ -135,8 +135,8 @@
     (function () {
       "use strict";
       // ----- Settings for this business. Everything can also be set in the link, for example:
-      //   /story/?to=919987264204&shop=Chitra%20Katha&from=08:00&till=23:00&every=60&days=7&c=0f766e
-      var CFG = { to: "919987264204", shop: "Chitra Katha - A Story Per Stay", from: "08:00", till: "23:00", every: 60, days: 7, lead: 30, color: "0f766e", tz: "Asia/Kolkata" };
+      //   /story/?to=919987264204&shop=Chitra%20Katha&from=08:00&till=21:00&every=60&days=7&c=0f766e
+      var CFG = { to: "919987264204", shop: "Chitra Katha - A Story Per Stay", from: "08:00", till: "21:00", every: 60, days: 7, lead: 30, color: "0f766e", tz: "Asia/Kolkata" };
 
       var q = new URLSearchParams(location.search);
       function clock(v, fb) { var m = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(String(v || "")); return m ? (+m[1]) * 60 + (+m[2]) : fb; }
